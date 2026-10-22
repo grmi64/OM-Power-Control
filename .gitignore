@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+dist/
+release/
+*.spec
+*.pcap
+*.pcapng
+settings.json
+.DS_Store

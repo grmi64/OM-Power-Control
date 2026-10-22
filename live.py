@@ -1,0 +1,146 @@
+"""Local monitoring prototype. Captured connection/status requests C, ?, and telemetry poll # only."""
+import argparse,json,socket,threading,time,secrets,fcntl,tempfile,signal,os
+from pathlib import Path
+from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
+from decoder import Decoder
+from controls import Controls
+import settings
+from collections import deque
+from session_protocol import amplifier_session
+
+class Monitor:
+ def __init__(self):
+  self.lock=threading.Lock();self.stop=threading.Event();self.thread=None;self.settings=settings.load();self.controls=Controls();self.state={'connection':'Disconnected'};self.connection_history=deque(maxlen=32)
+ def snapshot(self):
+  with self.lock:s={**self.state,'control':self.controls.view(),'settings':dict(self.settings),'connection_history':list(self.connection_history)}
+  now=time.monotonic();age=now-s.pop('_received',now)
+  s['age_seconds']=round(age,1)
+  if s['connection']=='Connected' and age>3:s['connection']='Stale'
+  measurement_age=now-s.pop('_measurement',0)
+  if s['connection']!='Connected':
+   s.update(forward=None,reflected=None,swr=None,input=None)
+  elif s.get('rf_idle_confirmed') is True and not s.get('transmitting'):
+   s.update(forward=0,reflected=0,swr=None,input=0)
+  elif measurement_age>3:
+   s.update(forward=None,reflected=None,swr=None,input=None)
+  return s
+ def record_connection(self,event):
+  with self.lock:self.connection_history.append({'time':round(time.time(),3),'event':event})
+ def connect(self):
+  with self.lock:
+   if self.thread and self.thread.is_alive():return
+   if not self.settings['host']:raise ValueError('Set and save the amplifier address before connecting')
+   self.stop.clear();self.controls=Controls();self.state={'connection':'Connecting'}
+   self.thread=threading.Thread(target=self.run,daemon=True);self.thread.start()
+ def configure(self,value):
+  with self.lock:
+   value=settings.validate(value)
+   active=self.thread and self.thread.is_alive()
+   if active and any(value[k]!=self.settings[k] for k in ('host','port','model')):raise ValueError('Disconnect before changing amplifier address, port or model')
+   self.settings=settings.save(value)
+ def command(self,action,key,expected_mode=None):
+  with self.lock:
+   if self.settings.get('model','OM-3501A')!='OM-3501A':raise ValueError('Monitoring only: controls are unverified for this model')
+   self.controls.request(action,key,self.state,expected_mode)
+ def disconnect(self):
+  with self.lock:
+   self.stop.set()
+   if self.thread and self.thread.is_alive():self.state={'connection':'Disconnecting'}
+ def run(self):
+  dec=Decoder();received=time.monotonic();measurement=0
+  try:
+   with amplifier_session((self.settings['host'],self.settings['port']),self.stop,self.record_connection) as (sock,handshake):
+    dec.feed(handshake)
+    sock.sendall(b'?')
+    next_poll=0;next_status=time.monotonic()+2
+    with self.lock:self.state={'connection':'Waiting for amplifier data','_received':received}
+    while not self.stop.is_set():
+     now=time.monotonic()
+     with self.lock:
+      self.controls.tick()
+      command=self.controls.take(self.state)
+     if command:
+      sock.sendall(command);next_status=now+2
+     if now>=next_status and not command and not dec.state.get('transmitting') and dec.state.get('status') not in ('Warming up','Cooling down','Off'):
+      with self.lock:waiting=self.controls.pending is not None
+      if not waiting:sock.sendall(b'?')
+      next_status=now+2
+     if now>=next_poll:
+      sock.sendall(b'#');next_poll=now+1
+     try:data=sock.recv(8192)
+     except socket.timeout:
+      if time.monotonic()-received>10:raise TimeoutError('No amplifier data for 10 seconds')
+      continue
+     if not data:raise ConnectionError('Amplifier closed the connection')
+     revision=dec.measurement_revision
+     updates=dec.feed(data)
+     if updates:
+      received=time.monotonic()
+      # Only a complete binary frame or explicit transmit-stop confirms fresh power.
+      if dec.measurement_revision!=revision:measurement=received
+      with self.lock:
+       self.controls.observe(dec.tokens)
+       self.state={**updates[-1],'connection':'Connected','_received':received,'_measurement':measurement}
+  except Exception as e:
+   self.record_connection('Connection ended: '+str(e))
+   with self.lock:
+    self.controls.lost()
+    self.state={'connection':'Disconnected','error':str(e)}
+  finally:
+   if self.stop.is_set():
+    with self.lock:
+     self.controls.lost()
+     self.state={'connection':'Disconnected'}
+
+class Handler(BaseHTTPRequestHandler):
+ def log_message(self,*args):pass
+ def send(self,status,data,kind='application/json'):
+  self.send_response(status);self.send_header('Content-Type',kind);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+ def do_GET(self):
+  if self.path=='/':self.send(200,self.server.html.encode(),'text/html; charset=utf-8')
+  elif self.path=='/state':self.send(200,json.dumps(self.server.monitor.snapshot()).encode())
+  else:self.send(404,b'{}')
+ def do_POST(self):
+  if self.headers.get('X-OM-Token')!=self.server.token:self.send(403,b'{}');return
+  if self.path=='/connect':
+   try:self.server.monitor.connect()
+   except ValueError as e:
+    self.send(409,json.dumps({'error':str(e)}).encode());return
+  elif self.path=='/disconnect':self.server.monitor.disconnect()
+  elif self.path=='/settings':
+   try:
+    size=int(self.headers.get('Content-Length','0'))
+    if not 0<size<=2048:raise ValueError('Invalid settings size')
+    self.server.monitor.configure(json.loads(self.rfile.read(size)))
+   except (ValueError,TypeError,OSError) as e:
+    self.send(409,json.dumps({'error':str(e)}).encode());return
+  elif self.path.startswith('/control/'):
+   try:
+    size=int(self.headers.get('Content-Length','0'))
+    if size>1024:raise ValueError('Request too large')
+    value=json.loads(self.rfile.read(size))
+    self.server.monitor.command(self.path.rsplit('/',1)[-1],value.get('id'),value.get('expected_mode'))
+   except (ValueError,TypeError,AttributeError) as e:
+    self.send(409,json.dumps({'error':str(e)}).encode());return
+  else:self.send(404,b'{}');return
+  self.send(200,b'{}')
+
+def main():
+ p=argparse.ArgumentParser();p.add_argument('--port',type=int,default=51851);a=p.parse_args()
+ # One instance on this computer. No reconnect loop; Windows app must be disconnected separately.
+ lock=open(Path(tempfile.gettempdir())/'om3501a-monitor.lock','w')
+ try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+ except BlockingIOError:raise SystemExit('Another OM monitor is already running')
+ server=ThreadingHTTPServer(('127.0.0.1',a.port),Handler);server.monitor=Monitor();server.token=secrets.token_urlsafe(32)
+ server.html=Path(__file__).with_name('live.html').read_text().replace('__TOKEN__',server.token).replace('__PRESENTATION__',Path(__file__).with_name('presentation.js').read_text())
+ print(f'OM monitor: http://127.0.0.1:{server.server_port}',flush=True)
+ def terminate(signum,frame):raise KeyboardInterrupt
+ signal.signal(signal.SIGTERM,terminate)
+ if server.monitor.settings['auto_connect']:server.monitor.connect()
+ try:server.serve_forever()
+ except KeyboardInterrupt:pass
+ finally:
+  server.monitor.disconnect()
+  if server.monitor.thread:server.monitor.thread.join(4)
+  server.server_close();lock.close()
+if __name__=='__main__':main()
