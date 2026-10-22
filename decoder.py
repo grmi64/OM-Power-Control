@@ -27,7 +27,7 @@ def packets(path,host=None,port=10001):
             yield ((hi<<32)|lo)*res,(src,sp,dst,dp),seq,payload
 
 class Decoder:
-    def __init__(self):self.tokens=[];self.measurement_revision=0;self.buffer=b'';self.state={ 'status':'Unknown','transmitting':False,'forward':None,'reflected':None,'swr':None }
+    def __init__(self):self.tokens=[];self.measurement_revision=0;self.field_revisions={};self.buffer=b'';self.state={ 'status':'Unknown','transmitting':False,'forward':None,'reflected':None,'swr':None }
     def feed(self,data):
         self.tokens=[];self.buffer+=data; updates=[]
         while self.buffer:
@@ -39,7 +39,9 @@ class Decoder:
                 self.state['rf_idle_confirmed']=False
                 f=int.from_bytes(v[:2],'little');r=v[2]*2
                 ratio=math.sqrt(r/f) if f>r and f>0 else None
-                self.state.update(transmitting=(self.state.get('transmitting',False) or f>0 or v[3]>0),forward=f,reflected=r,input=v[3],swr=(1+ratio)/(1-ratio) if ratio is not None else None,raw=v.hex())
+                self.state.update(transmitting=(self.state.get('transmitting',False) or f>0 or v[3]>0),forward=f,reflected=r,input=v[3],swr=(1+ratio)/(1-ratio) if ratio is not None else None,raw=v.hex(),screen_ma=int.from_bytes(v[4:5],'little',signed=True))
+                self.mark('screen_ma')
+                self.state['gain_db']=10*math.log10(f/v[3]) if f>0 and v[3]>0 else None
             else:
                 end=self.buffer.find(b';')
                 if end<0:
@@ -50,7 +52,7 @@ class Decoder:
                 if token.startswith('ST') and token!='STBY':self.state['startup_status_reply']=token
                 status_match=re.fullmatch(r'ST(\d{4})-.*',token)
                 if status_match:
-                    self.state['status']={'1100':'Standby','1110':'Operate'}.get(status_match[1],'Unknown')
+                    self.state['status']={'1100':'Standby','1110':'Operate','2000':'Off'}.get(status_match[1],'Unknown')
                     self.state.pop('countdown',None)
                 if token in ('OPERATE','STBY','PAOFF','PAON'):self.state['status']={'OPERATE':'Operate','STBY':'Standby','PAOFF':'Off','PAON':'On'}[token];self.state.pop('countdown',None)
                 elif token=='COON':self.state['status']='Cooling down'
@@ -60,11 +62,20 @@ class Decoder:
                     self.state['rf_idle_confirmed']=token=='PTTOFF'
                     if token=='PTTOFF':
                         self.measurement_revision+=1
-                        self.state.update(forward=0,reflected=0,swr=None,input=0)
-                elif token.startswith('FR'):self.state['frequency_khz']=int(token[2:])
+                        self.state.update(forward=0,reflected=0,swr=None,input=0,gain_db=None)
+                elif re.fullmatch(r'FR\d+',token):
+                    self.state['frequency_khz']=int(token[2:]);self.mark('frequency_khz')
+                else:
+                    m=re.fullmatch(r'(IP|UP|UGA|UGB|US|UHA|UHB|UM|TE)(-?\d+(?:\.\d+)?)',token)
+                    if m:
+                        key,raw=m.groups();value=float(raw)
+                        fields={'IP':('plate_a',.001),'UP':('plate_v',1),'US':('screen_v',1),'UHA':('heater_a_v',1),'UHB':('heater_b_v',1),'UM':('mains_v',1),'TE':('temperature_c',.5),'UGA':('grid_a_v',1),'UGB':('grid_b_v',1)}
+                        name,scale=fields[key];self.state[name]=value*scale;self.mark(name)
                 self.state['last_status']=token
             updates.append(dict(self.state))
         return updates
+
+    def mark(self,key):self.field_revisions[key]=self.field_revisions.get(key,0)+1
 
 def replay(path):
     dec=Decoder(); expected=None; stream=None; events=[]; start=None

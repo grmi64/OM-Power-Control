@@ -17,7 +17,7 @@ class Tests(unittest.TestCase):
  def test_only_poll_and_clean_disconnect(self):
   m=Monitor();s=FakeSocket(m)
   with patch('live.socket.create_connection',return_value=s):m.run()
-  self.assertEqual(s.sent,[b'C',b'?',b'#',b'C']);self.assertEqual(m.snapshot()['connection'],'Disconnected');self.assertIsNone(m.snapshot()['forward'])
+  self.assertEqual(s.sent,[b'C',b'?',b'#',b'F',b'C']);self.assertEqual(m.snapshot()['connection'],'Disconnected');self.assertIsNone(m.snapshot()['forward'])
  def test_worker_sends_toggle_once_and_confirms(self):
   m=Monitor()
   class ControlSocket(FakeSocket):
@@ -38,6 +38,13 @@ class Tests(unittest.TestCase):
  def test_stale_clears_readings(self):
   m=Monitor();m.state={'connection':'Connected','_received':time.monotonic()-4,'_measurement':time.monotonic()-4,'forward':1433,'reflected':12,'swr':1.2}
   s=m.snapshot();self.assertEqual(s['connection'],'Stale');self.assertIsNone(s['forward'])
+ def test_extra_telemetry_has_independent_freshness(self):
+  m=Monitor();m.state={'connection':'Connected','_received':99,'_field_times':{'plate_a':99,'grid_a_v':99,'grid_b_v':99,'frequency_khz':91},'plate_a':.86,'grid_a_v':75,'grid_b_v':150,'frequency_khz':14078,'screen_ma':-2}
+  with patch('live.time.monotonic',return_value=100):
+   v=m.snapshot();self.assertEqual(v['plate_a'],.86);self.assertEqual(v['grid_v'],-75);self.assertEqual(v['frequency_khz'],14078);self.assertIsNone(v['screen_ma'])
+  m.state['_received']=104
+  with patch('live.time.monotonic',return_value=104):
+   v=m.snapshot();self.assertIsNone(v['plate_a']);self.assertIsNone(v['grid_v']);self.assertIsNone(v['frequency_khz'])
  def test_connection_failure(self):
   m=Monitor()
   with patch('live.socket.create_connection',side_effect=OSError('Test unavailable')):m.run()
@@ -90,5 +97,5 @@ class Tests(unittest.TestCase):
     m.stop.set();return b'TE63;'
   sock=PollSocket(m)
   with patch('live.socket.create_connection',return_value=sock),patch('live.time.monotonic',side_effect=lambda:clock[0]):m.run()
-  self.assertGreaterEqual(sock.sent.count(b'?'),2);self.assertTrue(set(sock.sent)<={b'C',b'?',b'#'})
+  self.assertGreaterEqual(sock.sent.count(b'?'),2);self.assertTrue(set(sock.sent)<={b'C',b'?',b'#',b'F'})
 if __name__=='__main__':unittest.main()

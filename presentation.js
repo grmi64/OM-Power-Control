@@ -73,3 +73,28 @@ function mismatchColor(s){
  return 'rgb('+a.map((v,j)=>Math.round(v+(b[j]-v)*t)).join(', ')+')';
 }
 if(typeof module!=='undefined')module.exports.mismatchColor=mismatchColor;
+
+// Model profile: keep the monitored parameter separate from its visual meter.
+const OM3501A_PROFILE=Object.freeze({key:'screen_ma',label:'Screen current · Iscreen',unit:'mA',min:-60,max:60});
+function auxiliaryMeter(s,profile=OM3501A_PROFILE){
+ const value=s[profile.key],valid=s.connection==='Connected'&&!(s.age_seconds>3)&&typeof value==='number'&&Number.isFinite(value);
+ const position=valid?100*(Math.max(profile.min,Math.min(profile.max,value))-profile.min)/(profile.max-profile.min):50;
+ return {label:profile.label,unit:profile.unit,value:valid?value:null,position,min:profile.min,max:profile.max};
+}
+if(typeof module!=='undefined')module.exports.auxiliaryMeter=auxiliaryMeter;
+
+// Display ranges, not amplifier operating limits. Numeric values remain unclipped.
+const SECONDARY_PROFILES=Object.freeze({
+ reflected:{label:'Reflected',menu:'Reflected power (Preflect)',unit:'W',max:500,digits:0},
+ input:{label:'Input power',menu:'Input power (Pinput)',unit:'W',max:100,digits:0},
+ plate_a:{label:'Plate current',menu:'Anode (plate) current (Iplate)',unit:'A',max:3,digits:2},
+ gain_db:{label:'Calc gain',menu:'Calculated gain',unit:'dB',max:30,digits:1}
+});
+function secondaryMeter(s,key='reflected'){
+ if(!Object.hasOwn(SECONDARY_PROFILES,key))key='reflected';
+ const p=SECONDARY_PROFILES[key],v=s[key];
+ const valid=s.connection==='Connected'&&!(s.age_seconds>3)&&typeof v==='number'&&Number.isFinite(v);
+ const value=valid?v:null,position=value===null?0:100*Math.max(0,Math.min(p.max,value))/p.max;
+ return {...p,key,value,position,ticks:[0,p.max/2,p.max],color:key==='reflected'?mismatchColor(s):value===null?'#a5b2b6':'#79d5b3'};
+}
+if(typeof module!=='undefined'){module.exports.secondaryMeter=secondaryMeter;module.exports.SECONDARY_PROFILES=SECONDARY_PROFILES;}

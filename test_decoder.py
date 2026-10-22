@@ -9,6 +9,13 @@ class Tests(unittest.TestCase):
   for cut in range(len(msg)+1):
    d=Decoder();self.assertEqual(d.feed(msg[:cut])+d.feed(msg[cut:]),baseline)
   reading=baseline[1];self.assertEqual(reading['forward'],1433);self.assertEqual(reading['reflected'],12);self.assertEqual(reading['input'],21);self.assertEqual(round(reading['swr'],1),1.2)
+ def test_extended_fields_and_fragmentation(self):
+  msg=b'IP862;UP3096;UGA75;UGB150;US337;UHA27.8;UHB27.8;UM239;TE64;FR14078;='+bytes.fromhex('99050615fefe362b')+b';'
+  for cut in range(len(msg)+1):
+   d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:]);s=d.state
+   for key,value in {'plate_a':.862,'plate_v':3096,'grid_a_v':75,'grid_b_v':150,'screen_v':337,'heater_a_v':27.8,'mains_v':239,'temperature_c':32,'frequency_khz':14078,'screen_ma':-2}.items():self.assertEqual(s[key],value)
+   self.assertAlmostEqual(s['gain_db'],18.34,places=2)
+  d.feed(b'PTTOFF;');self.assertIsNone(d.state['gain_db'])
  def test_binary_delimiters(self):
   d=Decoder();r=d.feed(b'='+bytes([59,5,6,21,0,61,59,0])+b';');self.assertEqual(r[0]['forward'],1339)
  @unittest.skipUnless(CAPTURE_DIR,'Optional private hardware capture not supplied')
@@ -18,7 +25,7 @@ class Tests(unittest.TestCase):
  def test_readings(self):
   rows=replay(CAPTURE_DIR/'OM3501A-readings.pcapng');r=[x for x in rows if x.get('forward')==1433 and x.get('input')==21];self.assertTrue(r);self.assertEqual(rows[-1]['forward'],0);self.assertFalse(rows[-1]['transmitting']);self.assertAlmostEqual(rows[-1]['time'],49.012,places=2)
  def test_verified_startup_codes_and_fragmentation(self):
-  for code,mode in [('1110','Operate'),('1100','Standby')]:
+  for code,mode in [('1110','Operate'),('1100','Standby'),('2000','Off')]:
    msg=('ST'+code+'- HEXBEAM;').encode()
    for cut in range(len(msg)+1):
     d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:]);self.assertEqual(d.state['status'],mode)

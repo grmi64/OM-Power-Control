@@ -94,8 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
                 } else if let stored = UserDefaults.standard.string(forKey: "OM3501AFullFrame") {
                     fullFrame = NSRectFromString(stored)
                 }
-                window.minSize = NSSize(width: 380, height: 560)
-                window.setContentSize(NSSize(width: 400, height: 540))
+                window.minSize = NSSize(width: 380, height: 680)
+                window.setContentSize(NSSize(width: 400, height: 690))
             } else {
                 window.minSize = NSSize(width: 650, height: 650)
                 if let frame = fullFrame { window.setFrame(frame, display: true) }

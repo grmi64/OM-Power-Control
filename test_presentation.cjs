@@ -55,3 +55,18 @@ for(const extra of [{connection:'Stale'},{age_seconds:4},{transmitting:false},{f
 console.log('Mismatch gradient and idle/unavailable checks passed');
 
 for(const key of ['toggle','on','off'])assert.equal(c({...live,status:'Standby',settings:{model:'OM-4001A'}})[key].disabled,true);
+
+const {auxiliaryMeter:aux}=require('./presentation.js');
+for(const [value,position] of [[-80,0],[-60,0],[-30,25],[0,50],[30,75],[60,100],[80,100]])assert.equal(aux({connection:'Connected',screen_ma:value}).position,position);
+assert.equal(aux({connection:'Stale',screen_ma:2}).value,null);assert.equal(aux({connection:'Connected',screen_ma:null}).value,null);
+assert.equal(aux({connection:'Connected',plate_a:.5},{key:'plate_a',label:'Plate current',unit:'A',min:0,max:1}).position,50);
+console.log('Configurable auxiliary meter checks passed');
+
+const {secondaryMeter}=require('./presentation.js');
+for(const [key,value,max] of [['reflected',250,500],['input',50,100],['plate_a',1.5,3],['gain_db',15,30]]){
+ const m=secondaryMeter({connection:'Connected',[key]:value},key);assert.equal(m.position,50);assert.equal(m.value,value);assert.equal(m.max,max);assert.deepEqual(m.ticks,[0,max/2,max]);
+ assert.equal(secondaryMeter({connection:'Stale',[key]:value},key).value,null);
+ assert.equal(secondaryMeter({connection:'Connected',[key]:max*2},key).position,100);
+ assert.equal(secondaryMeter({connection:'Connected',[key]:null},key).value,null);
+}
+console.log('Selectable secondary-meter ranges and unavailable states pass');

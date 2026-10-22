@@ -1,9 +1,18 @@
-OM Power Control 0.1.15 beta
+OM Power Control 0.1.21 beta
 
-Initial public release for Apple Silicon, macOS 14 or later.
+Apple Silicon · macOS 14 or later.
 
-Tested on one OM-3501A: readings, Operate/Standby, normal cooling/power-off and warm-up/power-on, full/compact views, saved preferences and reconnect. No Intel or Windows binary is included. Other models are unverified and monitoring only. Reflected-power scaling is not calibrated across the full range. If automatic connection fails, review the address and macOS Local Network permission, then try Connect.
+New since 0.1.15:
+- Added expandable amplifier measurements, frequency and temperature in both views, and a signed screen-current meter.
+- Added a saved Measurements selector for reflected power, input power, anode/plate current or calculated gain. Labels, units and bar scales change together; the selected item is disabled in the menu.
+- Aligned the screen-current marker with the scale labels, including zero and ±30 mA.
+- Tidied the compact layout, standardized expanders to +/−, and added NY6C attribution.
+- Added freshness checks for additional telemetry and recognition of the verified powered-off listener status.
 
-Download the DMG, open it, drag OM Power Control into Applications, eject the DMG, then open the app from Applications. Close other amplifier clients before connecting.
+The app and DMG are Developer ID signed, Apple-notarized and stapled. No Python installation is required.
+
+Installation: download the DMG, open it, drag OM Power Control to Applications, eject the DMG, then launch from Applications. Quit the previous version before replacing it. Close other amplifier clients before connecting. Existing local settings are retained; new installs have no station address and auto-connect is off.
+
+Tested with one OM-3501A. Other models remain unverified and monitoring only. Additional telemetry scaling and full-range reflected-power calibration remain under validation. The bar scales are display ranges, not operating limits. No Intel or Windows binary is included.
 
 No station settings or network captures are distributed.

@@ -3,6 +3,8 @@ import argparse,json,socket,threading,time,secrets,fcntl,tempfile,signal,os
 from pathlib import Path
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from decoder import Decoder
+SLOW_FIELDS=('plate_a','plate_v','screen_v','heater_a_v','heater_b_v','mains_v','temperature_c','grid_a_v','grid_b_v')
+EXTRA_FIELDS=(*SLOW_FIELDS,'screen_ma','frequency_khz')
 from controls import Controls
 import settings
 from collections import deque
@@ -13,6 +15,7 @@ class Monitor:
   self.lock=threading.Lock();self.stop=threading.Event();self.thread=None;self.settings=settings.load();self.controls=Controls();self.state={'connection':'Disconnected'};self.connection_history=deque(maxlen=32)
  def snapshot(self):
   with self.lock:s={**self.state,'control':self.controls.view(),'settings':dict(self.settings),'connection_history':list(self.connection_history)}
+  field_times=s.pop('_field_times',{})
   now=time.monotonic();age=now-s.pop('_received',now)
   s['age_seconds']=round(age,1)
   if s['connection']=='Connected' and age>3:s['connection']='Stale'
@@ -23,6 +26,11 @@ class Monitor:
    s.update(forward=0,reflected=0,swr=None,input=0)
   elif measurement_age>3:
    s.update(forward=None,reflected=None,swr=None,input=None)
+  for key in EXTRA_FIELDS:
+   limit=12 if key=='frequency_khz' else 3
+   if s['connection']!='Connected' or now-field_times.get(key,0)>limit:s[key]=None
+  s['grid_v']=s['grid_a_v']-s['grid_b_v'] if s.get('grid_a_v') is not None and s.get('grid_b_v') is not None else None
+  if s.get('forward') is None or s.get('input') is None:s['gain_db']=None
   return s
  def record_connection(self,event):
   with self.lock:self.connection_history.append({'time':round(time.time(),3),'event':event})
@@ -34,10 +42,13 @@ class Monitor:
    self.thread=threading.Thread(target=self.run,daemon=True);self.thread.start()
  def configure(self,value):
   with self.lock:
-   value=settings.validate(value)
+   value=settings.validate({**self.settings,**value})
    active=self.thread and self.thread.is_alive()
    if active and any(value[k]!=self.settings[k] for k in ('host','port','model')):raise ValueError('Disconnect before changing amplifier address, port or model')
    self.settings=settings.save(value)
+ def configure_display(self,value):
+  if not isinstance(value,dict) or set(value)!={'secondary_measurement'}:raise ValueError('Choose a display measurement')
+  with self.lock:self.settings=settings.save({**self.settings,**value})
  def command(self,action,key,expected_mode=None):
   with self.lock:
    if self.settings.get('model','OM-3501A')!='OM-3501A':raise ValueError('Monitoring only: controls are unverified for this model')
@@ -47,12 +58,12 @@ class Monitor:
    self.stop.set()
    if self.thread and self.thread.is_alive():self.state={'connection':'Disconnecting'}
  def run(self):
-  dec=Decoder();received=time.monotonic();measurement=0
+  dec=Decoder();received=time.monotonic();measurement=0;field_times={}
   try:
    with amplifier_session((self.settings['host'],self.settings['port']),self.stop,self.record_connection) as (sock,handshake):
     dec.feed(handshake)
     sock.sendall(b'?')
-    next_poll=0;next_status=time.monotonic()+2
+    next_poll=0;next_frequency=0;next_status=time.monotonic()+2
     with self.lock:self.state={'connection':'Waiting for amplifier data','_received':received}
     while not self.stop.is_set():
      now=time.monotonic()
@@ -67,20 +78,25 @@ class Monitor:
       next_status=now+2
      if now>=next_poll:
       sock.sendall(b'#');next_poll=now+1
+     with self.lock:waiting=self.controls.pending is not None
+     if now>=next_frequency and not command and not waiting:
+      sock.sendall(b'F');next_frequency=now+5
      try:data=sock.recv(8192)
      except socket.timeout:
       if time.monotonic()-received>10:raise TimeoutError('No amplifier data for 10 seconds')
       continue
      if not data:raise ConnectionError('Amplifier closed the connection')
-     revision=dec.measurement_revision
+     revision=dec.measurement_revision;field_revisions=dict(dec.field_revisions)
      updates=dec.feed(data)
      if updates:
       received=time.monotonic()
       # Only a complete binary frame or explicit transmit-stop confirms fresh power.
       if dec.measurement_revision!=revision:measurement=received
+      for key,count in dec.field_revisions.items():
+       if field_revisions.get(key)!=count:field_times[key]=received
       with self.lock:
        self.controls.observe(dec.tokens)
-       self.state={**updates[-1],'connection':'Connected','_received':received,'_measurement':measurement}
+       self.state={**updates[-1],'connection':'Connected','_received':received,'_measurement':measurement,'_field_times':dict(field_times)}
   except Exception as e:
    self.record_connection('Connection ended: '+str(e))
    with self.lock:
@@ -107,11 +123,13 @@ class Handler(BaseHTTPRequestHandler):
    except ValueError as e:
     self.send(409,json.dumps({'error':str(e)}).encode());return
   elif self.path=='/disconnect':self.server.monitor.disconnect()
-  elif self.path=='/settings':
+  elif self.path in ('/settings','/display-settings'):
    try:
     size=int(self.headers.get('Content-Length','0'))
     if not 0<size<=2048:raise ValueError('Invalid settings size')
-    self.server.monitor.configure(json.loads(self.rfile.read(size)))
+    value=json.loads(self.rfile.read(size))
+    if self.path=='/display-settings':self.server.monitor.configure_display(value)
+    else:self.server.monitor.configure(value)
    except (ValueError,TypeError,OSError) as e:
     self.send(409,json.dumps({'error':str(e)}).encode());return
   elif self.path.startswith('/control/'):

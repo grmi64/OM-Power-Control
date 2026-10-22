@@ -33,6 +33,16 @@ class Tests(unittest.TestCase):
    self.assertIsNone(m.controls.pending)
    m.thread=unittest.mock.Mock();m.thread.is_alive.return_value=True
    with self.assertRaises(ValueError):m.configure({**m.settings,'model':'OM-3501A'})
+ def test_display_preference_persists_without_reconnecting(self):
+  from live import Monitor
+  with tempfile.TemporaryDirectory() as d,patch.dict(os.environ,{'OM_SETTINGS_PATH':str(Path(d)/'prefs.json')}):
+   m=Monitor();m.thread=unittest.mock.Mock();m.thread.is_alive.return_value=True
+   for key in ('reflected','input','plate_a','gain_db'):
+    m.configure_display({'secondary_measurement':key});self.assertEqual(settings.load()['secondary_measurement'],key)
+    self.assertEqual(Monitor().settings['secondary_measurement'],key)
+   self.assertEqual(m.settings['host'],'');self.assertIsNone(m.controls.pending)
+   with self.assertRaises(ValueError):m.configure_display({'secondary_measurement':'bad'})
+   with self.assertRaises(ValueError):m.configure_display({'secondary_measurement':'input','host':'192.0.2.2'})
  def test_invalid(self):
   for v in ({**settings.DEFAULTS,'port':0},{**settings.DEFAULTS,'host':'bad/host'},{**settings.DEFAULTS,'port':True}):
    with self.assertRaises(ValueError):settings.validate(v)

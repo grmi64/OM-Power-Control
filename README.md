@@ -7,6 +7,9 @@ The first public build is intended as a beta. Hardware verification so far cover
 ## Features
 
 - Forward power, reflected power and calculated SWR.
+- Frequency and temperature in full and compact views, plus a screen-current meter with aligned reference labels.
+- Expandable measurements: input power, plate current/voltage, screen current/voltage, grid voltage, heater voltages, mains voltage, temperature and calculated gain. Unavailable or stale telemetry is shown as a dash.
+- Saved display selector under Measurements: replace the reflected-power panel with input power, plate current or calculated gain, each with its own units and bar scale. The current choice is disabled in the menu.
 - SWR and reflected readings share a blended green/amber/red mismatch color; idle or unavailable readings are neutral.
 - Editable amplifier model label. OM-3501A is tested; other model names enable monitoring only and block operating commands. The model label does not select a different protocol.
 - Operate/Standby, normal shutdown/cooling, and power-on/warm-up.
@@ -23,7 +26,7 @@ Use the amplifier within its manufacturer operating requirements and your statio
 
 ## Protocol status
 
-The driver was independently implemented from local hardware traffic. Exact status codes ST1110 and ST1100 were verified against front-panel Operate and Standby. Unknown status codes remain unconfirmed. SWR is calculated from measured forward/reflected power. Two live RF comparisons matched the amplifier display; forward power/SWR were also checked against a separate PowerMaster II. Full-range measurement calibration and extensive fault testing are not claimed.
+The driver was independently implemented from local hardware traffic. Exact status codes ST1110 and ST1100 were verified against front-panel Operate and Standby. Unknown status codes remain unconfirmed. SWR is calculated from measured forward/reflected power. Two live RF comparisons matched the amplifier display; forward power/SWR were also checked against a separate PowerMaster II. Full-range measurement calibration and extensive fault testing are not claimed. Additional telemetry scaling remains under validation. The selectable secondary bars use display ranges (reflected: 0–500 W; input: 0–100 W; plate current: 0–3 A; gain: 0–30 dB), not operating limits. Readouts retain values beyond the bar endpoints.
 
 ## Building from source
 
@@ -34,6 +37,8 @@ python3 -m venv .venv
 .venv/bin/python -m pip install pyinstaller==6.22.3
 OM_BUILD_PYTHON="$PWD/.venv/bin/python" scripts/build.sh
 ```
+
+The current public release is 0.1.21 beta. Its DMG is Developer ID signed, notarized and stapled.
 
 The default local signature is ad hoc. To sign your own build, set OM_SIGN_IDENTITY to your Developer ID Application identity. Public binary distribution additionally needs a timestamped hardened-runtime signing pass, notarization, stapling and clean-machine installation testing. The build script is a local development build, not the complete public-release pipeline.
 

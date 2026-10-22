@@ -1,6 +1,6 @@
 import json,os,re,tempfile
 from pathlib import Path
-DEFAULTS={'host':'','port':10001,'auto_connect':False,'callsign':'','model':'OM-3501A'}
+DEFAULTS={'host':'','port':10001,'auto_connect':False,'callsign':'','model':'OM-3501A','secondary_measurement':'reflected'}
 def location():return Path(os.environ.get('OM_SETTINGS_PATH',str(Path.home()/'Library/Application Support/OM3501A Control/settings.json')))
 def validate(value):
  if not isinstance(value,dict):raise ValueError('Invalid connection settings')
@@ -12,7 +12,9 @@ def validate(value):
  model=str(value.get('model','OM-3501A')).strip().upper()
  if not model or len(model)>40 or any(ord(c)<32 for c in model):raise ValueError('Enter an amplifier model (up to 40 characters)')
  if len(callsign)>24:raise ValueError('Callsign is too long')
- return {'host':host,'port':port,'auto_connect':value.get('auto_connect') is True,'callsign':callsign,'model':model}
+ measurement=value.get('secondary_measurement','reflected')
+ if measurement not in ('reflected','input','plate_a','gain_db'):raise ValueError('Choose a supported display measurement')
+ return {'secondary_measurement':measurement,'host':host,'port':port,'auto_connect':value.get('auto_connect') is True,'callsign':callsign,'model':model}
 def load():
  try:return validate(json.loads(location().read_text()))
  except (OSError,ValueError,TypeError):return dict(DEFAULTS)
