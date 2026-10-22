@@ -16,6 +16,8 @@ The first public build is intended as a beta. Hardware verification so far cover
 - Amplifier-confirmed state, transmission guards and no automatic operating-command retries.
 - Full and compact views, saved stay-on-top and optional callsign badge.
 - Fixed 3500 W bar scale: green low-power region, amber at 1500 W, orange at 2500 W, red at 3500 W, with blended transitions. These are display colors, not calibrated protection limits or recommendations to transmit at a particular power.
+- Optional sharing with DX Caliber, off by default: the embedded panel uses this app’s existing amplifier connection. Standalone use does not require DX Caliber.
+- Save settings shows immediate saving and success/error feedback.
 - Optional auto-connect, off by default. One local reader process; disconnect other remote-control clients before connecting.
 
 ## Requirements and setup
@@ -38,7 +40,7 @@ python3 -m venv .venv
 OM_BUILD_PYTHON="$PWD/.venv/bin/python" scripts/build.sh
 ```
 
-The current public release is 0.1.21 beta. Its DMG is Developer ID signed, notarized and stapled.
+The current public release is 0.1.23 beta. Its DMG is Developer ID signed, notarized and stapled.
 
 The default local signature is ad hoc. To sign your own build, set OM_SIGN_IDENTITY to your Developer ID Application identity. Public binary distribution additionally needs a timestamped hardened-runtime signing pass, notarization, stapling and clean-machine installation testing. The build script is a local development build, not the complete public-release pipeline.
 

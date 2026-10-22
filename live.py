@@ -12,9 +12,9 @@ from session_protocol import amplifier_session
 
 class Monitor:
  def __init__(self):
-  self.lock=threading.Lock();self.stop=threading.Event();self.thread=None;self.settings=settings.load();self.controls=Controls();self.state={'connection':'Disconnected'};self.connection_history=deque(maxlen=32)
+  self.lock=threading.Lock();self.stop=threading.Event();self.thread=None;self.settings=settings.load();self.controls=Controls();self.state={'connection':'Disconnected'};self.connection_history=deque(maxlen=32);self.command_history=deque(maxlen=64)
  def snapshot(self):
-  with self.lock:s={**self.state,'control':self.controls.view(),'settings':dict(self.settings),'connection_history':list(self.connection_history)}
+  with self.lock:s={**self.state,'control':self.controls.view(),'settings':dict(self.settings),'connection_history':list(self.connection_history),'command_history':list(self.command_history)}
   field_times=s.pop('_field_times',{})
   now=time.monotonic();age=now-s.pop('_received',now)
   s['age_seconds']=round(age,1)
@@ -49,10 +49,18 @@ class Monitor:
  def configure_display(self,value):
   if not isinstance(value,dict) or set(value)!={'secondary_measurement'}:raise ValueError('Choose a display measurement')
   with self.lock:self.settings=settings.save({**self.settings,**value})
- def command(self,action,key,expected_mode=None):
+ def trace_command(self,phase,pending,message=''):
+  if pending:self.command_history.append({'time':round(time.time(),3),'phase':phase,'source':pending.get('source','standalone'),'action':pending.get('action'),'id':pending.get('id'),'message':message[:300]})
+ def command(self,action,key,expected_mode=None,source='standalone'):
   with self.lock:
-   if self.settings.get('model','OM-3501A')!='OM-3501A':raise ValueError('Monitoring only: controls are unverified for this model')
-   self.controls.request(action,key,self.state,expected_mode)
+   pending={'action':str(action)[:20],'id':str(key)[:100],'source':'DXC' if source=='DXC' else 'standalone'}
+   try:
+    if self.settings.get('model','OM-3501A')!='OM-3501A':raise ValueError('Monitoring only: controls are unverified for this model')
+    duplicate=key in self.controls.seen if isinstance(key,str) else False
+    self.controls.request(action,key,self.state,expected_mode)
+   except ValueError as exc:self.trace_command('rejected',pending,str(exc));raise
+   if self.controls.pending and not duplicate:self.controls.pending['source']=pending['source']
+   self.trace_command('duplicate ignored' if duplicate else 'queued',pending,self.controls.message)
  def disconnect(self):
   with self.lock:
    self.stop.set()
@@ -68,10 +76,13 @@ class Monitor:
     while not self.stop.is_set():
      now=time.monotonic()
      with self.lock:
-      self.controls.tick()
-      command=self.controls.take(self.state)
+      previous=self.controls.pending;self.controls.tick()
+      if previous and self.controls.pending is None:self.trace_command('uncertain',previous,self.controls.message)
+      previous=self.controls.pending;command=self.controls.take(self.state)
+      if previous and self.controls.pending is None:self.trace_command('cancelled',previous,self.controls.message)
      if command:
       sock.sendall(command);next_status=now+2
+      with self.lock:self.trace_command('sent',self.controls.pending)
      if now>=next_status and not command and not dec.state.get('transmitting') and dec.state.get('status') not in ('Warming up','Cooling down','Off'):
       with self.lock:waiting=self.controls.pending is not None
       if not waiting:sock.sendall(b'?')
@@ -95,17 +106,20 @@ class Monitor:
       for key,count in dec.field_revisions.items():
        if field_revisions.get(key)!=count:field_times[key]=received
       with self.lock:
-       self.controls.observe(dec.tokens)
+       previous=self.controls.pending;self.controls.observe(dec.tokens)
+       if previous and self.controls.pending is None:self.trace_command('uncertain' if self.controls.uncertain else 'confirmed',previous,self.controls.message)
        self.state={**updates[-1],'connection':'Connected','_received':received,'_measurement':measurement,'_field_times':dict(field_times)}
   except Exception as e:
    self.record_connection('Connection ended: '+str(e))
    with self.lock:
-    self.controls.lost()
+    previous=self.controls.pending;self.controls.lost()
+    if previous:self.trace_command('uncertain' if self.controls.uncertain else 'cancelled',previous,self.controls.message)
     self.state={'connection':'Disconnected','error':str(e)}
   finally:
    if self.stop.is_set():
     with self.lock:
-     self.controls.lost()
+     previous=self.controls.pending;self.controls.lost()
+     if previous:self.trace_command('uncertain' if self.controls.uncertain else 'cancelled',previous,self.controls.message)
      self.state={'connection':'Disconnected'}
 
 class Handler(BaseHTTPRequestHandler):
@@ -151,6 +165,9 @@ def main():
  except BlockingIOError:raise SystemExit('Another OM monitor is already running')
  server=ThreadingHTTPServer(('127.0.0.1',a.port),Handler);server.monitor=Monitor();server.token=secrets.token_urlsafe(32)
  server.html=Path(__file__).with_name('live.html').read_text().replace('__TOKEN__',server.token).replace('__PRESENTATION__',Path(__file__).with_name('presentation.js').read_text())
+ from dxc_feed import start as start_dxc_feed
+ try:feed=start_dxc_feed(server.monitor)
+ except OSError:feed=None
  print(f'OM monitor: http://127.0.0.1:{server.server_port}',flush=True)
  def terminate(signum,frame):raise KeyboardInterrupt
  signal.signal(signal.SIGTERM,terminate)
@@ -160,5 +177,6 @@ def main():
  finally:
   server.monitor.disconnect()
   if server.monitor.thread:server.monitor.thread.join(4)
+  if feed:feed.shutdown();feed.server_close()
   server.server_close();lock.close()
 if __name__=='__main__':main()

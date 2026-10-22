@@ -26,5 +26,9 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(nodes.secondaryLabel.textContent,label);assert.equal(nodes.reflected.textContent,value);assert.equal(nodes['metricOption_'+key].disabled,true);
   assert.equal(posts.at(-1).path,'/display-settings');assert.deepEqual(posts.at(-1).body,{secondary_measurement:key});
  }
+ let finishSave;const oldFetch=ctx.fetch;ctx.fetch=()=>new Promise(resolve=>finishSave=resolve);
+ const saving=nodes.save.onclick();assert.equal(nodes.save.disabled,true);assert.equal(nodes.save.textContent,'Saving…');assert.equal(nodes.settingsSaveStatus.textContent,'Saving settings…');
+ finishSave({ok:true,json:async()=>({})});await saving;assert.equal(nodes.save.disabled,false);assert.equal(nodes.settingsSaveStatus.textContent,'Settings saved.');
+ ctx.fetch=async()=>({ok:false,json:async()=>({error:'Disk full'})});await nodes.save.onclick();assert.equal(nodes.settingsSaveStatus.dataset.error,'true');assert.match(nodes.settingsSaveStatus.textContent,/not saved: Disk full/);ctx.fetch=oldFetch;
  console.log('Actual UI handlers: toggle skips prompt; power confirmations retained; RF guard and callsign badge pass');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -20,7 +20,7 @@ class Controls:
   if now-self.last_sent<2:raise ValueError('Please wait before sending another command')
   self.seen.add(key)
   if len(self.seen)>1000:raise ValueError('Reconnect before sending additional commands')
-  self.pending={'action':action,'sent':None,'expected_mode':expected_mode};self.message='Command queued'
+  self.pending={'id':key,'action':action,'sent':None,'expected_mode':expected_mode};self.message='Command queued'
  def take(self,state):
   if not self.pending or self.pending['sent'] is not None:return None
   reason=None

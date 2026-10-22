@@ -1,8 +1,13 @@
-OM Power Control 0.1.21 beta
+OM Power Control 0.1.23 beta
 
 Apple Silicon · macOS 14 or later.
 
-New since 0.1.15:
+New since 0.1.21:
+- Added optional local sharing of readings and controls with DX Caliber, using the existing amplifier connection; sharing is off by default.
+- Added immediate Save settings feedback beside the settings controls.
+- Added a bounded, current-session command history to help diagnose control acknowledgements.
+
+Included from earlier releases:
 - Added expandable amplifier measurements, frequency and temperature in both views, and a signed screen-current meter.
 - Added a saved Measurements selector for reflected power, input power, anode/plate current or calculated gain. Labels, units and bar scales change together; the selected item is disabled in the menu.
 - Aligned the screen-current marker with the scale labels, including zero and ±30 mA.
