@@ -1,3 +1,7 @@
+OM Power Control 0.1.31 beta
+
+- Adds Dismiss to completed auto-tune exit banners, including restored defaults and stopped-tune outcomes. Dismissal survives monitoring updates; a new tune shows its result again.
+
 OM Power Control 0.1.30 beta
 
 Apple Silicon · macOS 14 or later · by NY6C
