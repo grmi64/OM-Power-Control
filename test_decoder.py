@@ -34,6 +34,13 @@ class Tests(unittest.TestCase):
   d.feed(b'PTTOFF;TE66;');self.assertFalse(d.state['transmitting']);self.assertEqual(d.state['status'],'Operate');self.assertEqual(d.state['forward'],0)
  def test_query_recovers_missed_front_panel_mode_change(self):
   d=Decoder();d.feed(b'ST1110- HEXBEAM;');d.feed(b'ST1100- HEXBEAM;');self.assertEqual(d.state['status'],'Standby')
+ def test_antenna_selection_is_separate_from_operating_mode(self):
+  for code,name,mode,antenna in [('1110','HEXBEAM','Operate',1),('2110','DOUBLET','Operate',2),('1100','HEXBEAM','Standby',1),('2100','DOUBLET','Standby',2)]:
+   msg=('ST'+code+'- '+name+';').encode()
+   for cut in range(len(msg)+1):
+    d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:]);self.assertEqual(d.state['status'],mode);self.assertEqual(d.state['antenna_name'],name);self.assertEqual(d.state['antenna_number'],antenna)
+  d=Decoder();d.feed(b'ST2110- DOUBLET;PTTON;PTTOFF;ST2110- DOUBLET;');self.assertEqual(d.state['status'],'Operate')
+  d.feed(b'ST2000- DOUBLET;');self.assertEqual(d.state['status'],'Off');self.assertIsNone(d.state['antenna_number'])
  def test_unverified_code_does_not_claim_known_mode(self):
   d=Decoder();d.feed(b'ST1110- HEXBEAM;ST1120- HEXBEAM;');self.assertEqual(d.state['status'],'Unknown')
 if __name__=='__main__':unittest.main()

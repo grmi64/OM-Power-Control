@@ -1,9 +1,12 @@
-OM Power Control 0.1.24 beta
+OM Power Control 0.1.26 beta
 
 Apple Silicon · macOS 14 or later.
 
-New since 0.1.23:
-- Added About OM Power Control to the application menu, showing the release version, build number and NY6C attribution.
+New since 0.1.24:
+- Separate antenna selection from operating mode in status replies, including the hardware-verified antenna-2 DOUBLET Operate reply. Antenna switching no longer replaces that known operating mode with an unconfirmed state.
+- Display the amplifier-reported antenna name in full and compact views.
+- Share the saved display measurement with DX Caliber. DXC DEV 0.6.116 or later follows changes to the label, reading, units and scale together.
+- Retain the native About menu with release/build information and NY6C attribution.
 
 Included from earlier releases:
 - Added expandable amplifier measurements, frequency and temperature in both views, and a signed screen-current meter.

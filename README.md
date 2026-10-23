@@ -7,7 +7,7 @@ The first public build is intended as a beta. Hardware verification so far cover
 ## Features
 
 - Forward power, reflected power and calculated SWR.
-- Frequency and temperature in full and compact views, plus a screen-current meter with aligned reference labels.
+- Reported antenna name, frequency and temperature in full and compact views, plus a screen-current meter with aligned reference labels.
 - Expandable measurements: input power, plate current/voltage, screen current/voltage, grid voltage, heater voltages, mains voltage, temperature and calculated gain. Unavailable or stale telemetry is shown as a dash.
 - Saved display selector under Measurements: replace the reflected-power panel with input power, plate current or calculated gain, each with its own units and bar scale. The current choice is disabled in the menu.
 - SWR and reflected readings share a blended green/amber/red mismatch color; idle or unavailable readings are neutral.
@@ -16,7 +16,7 @@ The first public build is intended as a beta. Hardware verification so far cover
 - Amplifier-confirmed state, transmission guards and no automatic operating-command retries.
 - Full and compact views, saved stay-on-top and optional callsign badge.
 - Fixed 3500 W bar scale: green low-power region, amber at 1500 W, orange at 2500 W, red at 3500 W, with blended transitions. These are display colors, not calibrated protection limits or recommendations to transmit at a particular power.
-- Optional sharing with DX Caliber, off by default: the embedded panel uses this app’s existing amplifier connection. Standalone use does not require DX Caliber.
+- Optional sharing with DX Caliber, off by default: the embedded panel uses this app’s existing amplifier connection. Standalone use does not require DX Caliber. With DXC DEV 0.6.116 or later, its embedded meter follows the measurement selected here.
 - Save settings shows immediate saving and success/error feedback.
 - Optional auto-connect, off by default. One local reader process; disconnect other remote-control clients before connecting.
 
@@ -40,7 +40,7 @@ python3 -m venv .venv
 OM_BUILD_PYTHON="$PWD/.venv/bin/python" scripts/build.sh
 ```
 
-The current public release is 0.1.24 beta. Its DMG is Developer ID signed, notarized and stapled.
+The current public release is 0.1.26 beta. Its DMG is Developer ID signed, notarized and stapled.
 
 The default local signature is ad hoc. To sign your own build, set OM_SIGN_IDENTITY to your Developer ID Application identity. Public binary distribution additionally needs a timestamped hardened-runtime signing pass, notarization, stapling and clean-machine installation testing. The build script is a local development build, not the complete public-release pipeline.
 

@@ -12,7 +12,7 @@ ditto /tmp/om3501a-frozen/amp-engine "$APP/Contents/Resources/amp-engine"
 import plistlib,sys
 from pathlib import Path
 p=Path(sys.argv[1])/'Contents/Info.plist'
-p.write_bytes(plistlib.dumps(dict(CFBundleIdentifier='com.grmi64.OM3501AControl',CFBundleName='OM Power Control',CFBundleDisplayName='OM Power Control',CFBundleExecutable='OM3501AControl',CFBundlePackageType='APPL',CFBundleShortVersionString='0.1.24',CFBundleVersion='25',LSMinimumSystemVersion='14.0',NSHighResolutionCapable=True,NSPrincipalClass='NSApplication',NSLocalNetworkUsageDescription='Connect to your OM-3501A amplifier for readings and operating controls on your local network.',NSAppTransportSecurity={'NSAllowsLocalNetworking':True})))
+p.write_bytes(plistlib.dumps(dict(CFBundleIdentifier='com.grmi64.OM3501AControl',CFBundleName='OM Power Control',CFBundleDisplayName='OM Power Control',CFBundleExecutable='OM3501AControl',CFBundlePackageType='APPL',CFBundleShortVersionString='0.1.26',CFBundleVersion='27',LSMinimumSystemVersion='14.0',NSHighResolutionCapable=True,NSPrincipalClass='NSApplication',NSLocalNetworkUsageDescription='Connect to your OM-3501A amplifier for readings and operating controls on your local network.',NSAppTransportSecurity={'NSAllowsLocalNetworking':True})))
 PY
 cp Assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 /usr/libexec/PlistBuddy -c 'Add :CFBundleIconFile string AppIcon.icns' "$APP/Contents/Info.plist"

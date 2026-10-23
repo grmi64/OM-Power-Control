@@ -21,6 +21,11 @@ class FeedTests(unittest.TestCase):
   self.assertNotIn('192.0.2.1',json.dumps(data));self.assertNotIn('W1AW',json.dumps(data));self.assertNotIn('raw',data['om'])
   for headers in ({'Origin':'https://foreign.test'},{'Host':'foreign.test'}):
    with self.assertRaises(urllib.error.HTTPError):self.get(headers)
+ def test_saved_measurement_is_shared_and_changes_without_reconnect(self):
+  self.enable()
+  for choice in ('input','plate_a','gain_db','reflected'):
+   self.m.configure_display({'secondary_measurement':choice})
+   self.assertEqual(json.load(self.get())['om']['settings']['secondary_measurement'],choice)
  def post(self,token,value):return urllib.request.urlopen(urllib.request.Request(self.base+'/api/v1/control',json.dumps(value).encode(),headers={'X-OM-Feed-Token':token,'Content-Type':'application/json'}))
  def test_existing_controls_guard_and_single_request(self):
   self.enable();token=json.load(self.get())['control_token'];value={'action':'toggle','id':'request-test-123','expected_mode':'Standby'}

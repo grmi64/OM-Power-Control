@@ -50,9 +50,12 @@ class Decoder:
                 token=self.buffer[:end].decode('ascii');self.buffer=self.buffer[end+1:]
                 self.tokens.append(token)
                 if token.startswith('ST') and token!='STBY':self.state['startup_status_reply']=token
-                status_match=re.fullmatch(r'ST(\d{4})-.*',token)
+                status_match=re.fullmatch(r'ST(\d{4})-\s*(.*)',token)
                 if status_match:
-                    self.state['status']={'1100':'Standby','1110':'Operate','2000':'Off'}.get(status_match[1],'Unknown')
+                    code,name=status_match.groups()
+                    self.state['antenna_name']=name.strip()[:80]
+                    self.state['antenna_number']=int(code[0]) if code[0] in '12' and code[1:] in ('100','110') else None
+                    self.state['status']=('Operate' if code[1:]=='110' else 'Standby') if code[0] in '12' and code[1:] in ('100','110') else 'Off' if code=='2000' else 'Unknown'
                     self.state.pop('countdown',None)
                 if token in ('OPERATE','STBY','PAOFF','PAON'):self.state['status']={'OPERATE':'Operate','STBY':'Standby','PAOFF':'Off','PAON':'On'}[token];self.state.pop('countdown',None)
                 elif token=='COON':self.state['status']='Cooling down'
