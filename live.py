@@ -18,6 +18,7 @@ class Monitor:
   field_times=s.pop('_field_times',{})
   now=time.monotonic();age=now-s.pop('_received',now)
   s['age_seconds']=round(age,1)
+  s['autotune_age_seconds']=round(now-field_times.get('autotune',now),1)
   if s['connection']=='Connected' and age>3:s['connection']='Stale'
   measurement_age=now-s.pop('_measurement',0)
   if s['connection']!='Connected':
@@ -83,14 +84,14 @@ class Monitor:
      if command:
       sock.sendall(command);next_status=now+2
       with self.lock:self.trace_command('sent',self.controls.pending)
-     if now>=next_status and not command and not dec.state.get('transmitting') and dec.state.get('status') not in ('Warming up','Cooling down','Off'):
+     if now>=next_status and not command and not dec.state.get('transmitting') and dec.state.get('status') not in ('Warming up','Cooling down','Off') and dec.state.get('autotune_phase') not in ('entered','waiting','tuning','unknown','aborted'):
       with self.lock:waiting=self.controls.pending is not None
       if not waiting:sock.sendall(b'?')
       next_status=now+2
      if now>=next_poll:
       sock.sendall(b'#');next_poll=now+1
      with self.lock:waiting=self.controls.pending is not None
-     if now>=next_frequency and not command and not waiting:
+     if now>=next_frequency and not command and not waiting and dec.state.get('autotune_phase') not in ('entered','waiting','tuning','unknown','aborted'):
       sock.sendall(b'F');next_frequency=now+5
      try:data=sock.recv(8192)
      except socket.timeout:
@@ -114,13 +115,13 @@ class Monitor:
    with self.lock:
     previous=self.controls.pending;self.controls.lost()
     if previous:self.trace_command('uncertain' if self.controls.uncertain else 'cancelled',previous,self.controls.message)
-    self.state={'connection':'Disconnected','error':str(e)}
+    self.state={**self.state,'connection':'Disconnected','error':str(e)}
   finally:
    if self.stop.is_set():
     with self.lock:
      previous=self.controls.pending;self.controls.lost()
      if previous:self.trace_command('uncertain' if self.controls.uncertain else 'cancelled',previous,self.controls.message)
-     self.state={'connection':'Disconnected'}
+     self.state={**self.state,'connection':'Disconnected'}
 
 class Handler(BaseHTTPRequestHandler):
  def log_message(self,*args):pass

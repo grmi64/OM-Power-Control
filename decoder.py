@@ -57,6 +57,26 @@ class Decoder:
                     self.state['antenna_number']=int(code[0]) if code[0] in '12' and code[1:] in ('100','110') else None
                     self.state['status']=('Operate' if code[1:]=='110' else 'Standby') if code[0] in '12' and code[1:] in ('100','110') else 'Off' if code=='2000' else 'Unknown'
                     self.state.pop('countdown',None)
+                if token=='AUTO':self.state.update(autotune_phase='entered',autotune_message='Automatic tuning selected',autotune_saved=False,autotune_aborted=False,autotune_stop_reported=False,autotune_abort_origin=None,autotune_defaults=False,autotune_stopped_saved=False)
+                elif token=='AUTOESC':self.state.update(autotune_phase='cancelled',autotune_message='Automatic tuning exited',autotune_saved=False)
+                elif token.startswith('AUTO:'):
+                    message=token[5:].strip()
+                    phases={'WAITING FOR INPUT POWER':'waiting','AUTOTUNE IN PROGRESS':'tuning','AUTOTUNE DONE':'succeeded','AUTOTUNE ABORTED':'aborted'}
+                    phase=phases.get(message,'unknown')
+                    if phase=='aborted':
+                        self.state['autotune_aborted']=True
+                        self.state['autotune_abort_origin']='stop' if self.state.get('autotune_stop_reported') else 'rf_lost' if self.state.get('rf_idle_confirmed') else 'unknown'
+                    if self.state.get('autotune_aborted') and phase in ('waiting','tuning','succeeded'):phase='aborted'
+                    self.state.update(autotune_phase=phase,autotune_message=message,autotune_saved=False)
+                elif token=='STOP':self.state.update(autotune_phase='aborted',autotune_aborted=True,autotune_stop_reported=True,autotune_abort_origin='stop',autotune_message='Autotune stopped by operator',autotune_saved=False)
+                elif token.startswith('AUTO'):
+                    self.state.update(autotune_phase='unknown',autotune_message=token[:200],autotune_saved=False)
+                elif token=='SAVE DEFAULT' and self.state.get('autotune_phase')=='aborted':self.state.update(autotune_phase='defaults',autotune_message='Amplifier reported default settings saved',autotune_saved=False,autotune_defaults=True)
+                elif token=='SAVE USER' and self.state.get('autotune_phase')=='aborted' and self.state.get('autotune_abort_origin')=='stop':self.state.update(autotune_phase='stopped-exited',autotune_message='Amplifier reported user settings saved after Stop',autotune_saved=False,autotune_stopped_saved=True)
+                elif token=='SAVE USER' and self.state.get('autotune_phase')=='succeeded':self.state['autotune_saved']=True
+                elif re.fullmatch(r'(LO|TU|OT)-?\d+',token):
+                    # Raw positions only; engineering-unit conversion is not yet validated.
+                    prefix=token[:2];self.state[{'LO':'autotune_load_raw','TU':'autotune_tune_raw','OT':'autotune_offset_raw'}[prefix]]=int(token[2:])
                 if token in ('OPERATE','STBY','PAOFF','PAON'):self.state['status']={'OPERATE':'Operate','STBY':'Standby','PAOFF':'Off','PAON':'On'}[token];self.state.pop('countdown',None)
                 elif token=='COON':self.state['status']='Cooling down'
                 elif re.fullmatch(r'(WA|CO)\d+',token):self.state.update(status='Warming up' if token[:2]=='WA' else 'Cooling down',countdown=int(token[2:]))
@@ -74,6 +94,7 @@ class Decoder:
                         key,raw=m.groups();value=float(raw)
                         fields={'IP':('plate_a',.001),'UP':('plate_v',1),'US':('screen_v',1),'UHA':('heater_a_v',1),'UHB':('heater_b_v',1),'UM':('mains_v',1),'TE':('temperature_c',.5),'UGA':('grid_a_v',1),'UGB':('grid_b_v',1)}
                         name,scale=fields[key];self.state[name]=value*scale;self.mark(name)
+                if token.startswith('AUTO'):self.mark('autotune')
                 self.state['last_status']=token
             updates.append(dict(self.state))
         return updates
