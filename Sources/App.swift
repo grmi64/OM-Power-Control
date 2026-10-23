@@ -23,14 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         try? FileManager.default.createDirectory(at: lockDirectory, withIntermediateDirectories: true)
         lockFD = Darwin.open(lockDirectory.appendingPathComponent("instance.lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
         guard lockFD >= 0, flock(lockFD, LOCK_EX | LOCK_NB) == 0 else { NSApp.terminate(nil); return }
-        let menu = NSMenu()
-        let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "Quit OM Power Control", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        let item = NSMenuItem(); item.submenu = appMenu; menu.addItem(item)
-        let edit = NSMenu(title:"Edit")
-        for (title,selector,key) in [("Cut","cut:","x"),("Copy","copy:","c"),("Paste","paste:","v"),("Select All","selectAll:","a")] { edit.addItem(withTitle:title,action:NSSelectorFromString(selector),keyEquivalent:key) }
-        let editItem=NSMenuItem(title:"Edit",action:nil,keyEquivalent:""); editItem.submenu=edit; menu.addItem(editItem)
-        NSApp.mainMenu = menu
+        configureMenus()
         window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: 900,height: 900), styleMask: [.titled,.closable,.miniaturizable,.resizable], backing: .buffered, defer: false)
         window.title = "OM Power Control"
         window.minSize = NSSize(width: 620,height: 620)
@@ -50,6 +43,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
         web.autoresizingMask = [.width,.height]; window.contentView!.addSubview(web)
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
         launchReader()
+    }
+    func configureMenus() {
+        let menu = NSMenu()
+        let appMenu = NSMenu()
+        let about = appMenu.addItem(withTitle: "About OM Power Control…", action: #selector(showAbout(_:)), keyEquivalent: "")
+        about.target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit OM Power Control", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let item = NSMenuItem(); item.submenu = appMenu; menu.addItem(item)
+        let edit = NSMenu(title:"Edit")
+        for (title,selector,key) in [("Cut","cut:","x"),("Copy","copy:","c"),("Paste","paste:","v"),("Select All","selectAll:","a")] { edit.addItem(withTitle:title,action:NSSelectorFromString(selector),keyEquivalent:key) }
+        let editItem=NSMenuItem(title:"Edit",action:nil,keyEquivalent:""); editItem.submenu=edit; menu.addItem(editItem)
+        NSApp.mainMenu = menu
+    }
+    @objc func showAbout(_ sender: Any?) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationName: "OM Power Control",
+            .applicationVersion: version,
+            .version: "Build " + build,
+            .credits: NSAttributedString(string: "Created by NY6C\nIndependent, open-source amplifier control."),
+            .init(rawValue: "Copyright"): "© 2026 NY6C"
+        ])
+        NSApp.activate(ignoringOtherApps: true)
     }
     func launchReader() {
         guard let resources = Bundle.main.resourceURL else { return }

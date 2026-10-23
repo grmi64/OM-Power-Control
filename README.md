@@ -40,7 +40,7 @@ python3 -m venv .venv
 OM_BUILD_PYTHON="$PWD/.venv/bin/python" scripts/build.sh
 ```
 
-The current public release is 0.1.23 beta. Its DMG is Developer ID signed, notarized and stapled.
+The current public release is 0.1.24 beta. Its DMG is Developer ID signed, notarized and stapled.
 
 The default local signature is ad hoc. To sign your own build, set OM_SIGN_IDENTITY to your Developer ID Application identity. Public binary distribution additionally needs a timestamped hardened-runtime signing pass, notarization, stapling and clean-machine installation testing. The build script is a local development build, not the complete public-release pipeline.
 
