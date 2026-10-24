@@ -7,6 +7,10 @@ assert(autotunePresentation({...state,autotune_phase:'waiting',connection:'Disco
 assert(autotunePresentation({...state,autotune_phase:'unknown',autotune_message:'AUTO:FAULT'}).detail.includes('AUTO:FAULT'));
 assert.equal(autotunePresentation({...state,autotune_phase:'succeeded',autotune_saved:true}).title,'SUCCESSFUL AUTOTUNE!');
 assert(autotunePresentation({...state,transmitting:true}).startDisabled);assert(autotunePresentation({...state,settings:{model:'OM-4001A'}}).startDisabled);
+const unknownRF={...state,transmitting:null,rf_state_unknown:true};
+assert(autotunePresentation(unknownRF).startDisabled);assert(autotunePresentation({...unknownRF,autotune_phase:'waiting'}).exitDisabled);
+assert.equal(autotunePresentation({...unknownRF,autotune_phase:'tuning'}).stopDisabled,false);
+assert.match(autotunePresentation({...unknownRF,autotune_phase:'succeeded',autotune_saved:true}).detail,/RF state is unconfirmed/);
 console.log('Auto-tune presentation guards, saved success, unknown replies, delayed status and connection loss pass.');
 assert.equal(autotunePresentation({...state,transmitting:true,autotune_phase:'tuning',control:{cooldown_remaining:1}}).stopDisabled,false);
 assert(autotunePresentation({...state,autotune_phase:'waiting'}).stopDisabled);

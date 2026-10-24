@@ -20,13 +20,16 @@ def readiness_requirement(step,state):
  return action,data,mode if action=='toggle' else None
 
 class Monitor:
- def __init__(self,simulate=False,allow_hardware=False,read_only=False,mode_test=False,power_test=False,readiness_test=False):
-  if sum(map(bool,(read_only,mode_test,power_test,readiness_test)))>1:raise ValueError('Choose one amplifier access policy')
+ def __init__(self,simulate=False,allow_hardware=False,read_only=False,mode_test=False,power_test=False,readiness_test=False,tune_test=False,trace=None):
+  if sum(map(bool,(read_only,mode_test,power_test,readiness_test,tune_test)))>1:raise ValueError('Choose one amplifier access policy')
   self.lock=threading.Lock();self.stop=threading.Event();self.thread=None;self.settings=settings.load();self.controls=Controls();self.state={'connection':'Disconnected'};self.connection_history=deque(maxlen=32);self.command_history=deque(maxlen=64)
   self.simulate=simulate;self.allow_hardware=allow_hardware;self.read_only=read_only;self.simulator=None
   self.mode_test=mode_test;self.mode_test_sent=0
   self.power_test=power_test;self.power_test_sent=0
   self.readiness_test=readiness_test;self.readiness_test_sent=0
+  self.tune_test=tune_test;self.tune_test_counts={}
+  self.trace=trace
+  if tune_test:self.settings['share_dxc']=False
   if simulate:
    from simulator import SimulatedAmplifier
    self.simulator=SimulatedAmplifier();self.settings.update(host='simulation',auto_connect=False,share_dxc=False)
@@ -35,9 +38,18 @@ class Monitor:
   field_times=s.pop('_field_times',{})
   now=time.monotonic();age=now-s.pop('_received',now)
   s['age_seconds']=round(age,1)
+  s['tune_test']=self.tune_test;s['tune_test_counts']={k.decode('ascii'):v for k,v in self.tune_test_counts.copy().items()}
   s['autotune_age_seconds']=round(now-field_times.get('autotune',now),1)
   if s['connection']=='Connected' and age>3:s['connection']='Stale'
-  measurement_age=now-s.pop('_measurement',0)
+  measurement_received=s.pop('_measurement',None)
+  measurement_age=now-(measurement_received if measurement_received is not None else 0)
+  # Fresh temperatures/status do not refresh an old RF-active indication.
+  # Keep the internal RF latch and command guard; expose expired RF as unknown.
+  rf_received=field_times.get('rf',measurement_received)
+  rf_age=now-rf_received if rf_received is not None else None
+  s['rf_age_seconds']=round(rf_age,1) if rf_age is not None else None
+  s['rf_state_unknown']=s.get('transmitting') is True and (rf_age is None or rf_age>3)
+  if s['rf_state_unknown']:s['transmitting']=None
   if s['connection']!='Connected':
    s.update(forward=None,reflected=None,swr=None,input=None)
   elif s.get('rf_idle_confirmed') is True and not s.get('transmitting'):
@@ -52,6 +64,8 @@ class Monitor:
   return s
  def record_connection(self,event):
   with self.lock:self.connection_history.append({'time':round(time.time(),3),'event':event})
+ def trace_decoded(self,decoder,stage='stream'):
+  if self.trace is not None:self.trace.record('decoded',stage=stage,tokens=decoder.tokens,buffer_bytes=len(decoder.buffer),measurement_revision=decoder.measurement_revision,transmitting=decoder.state.get('transmitting'),rf_idle_confirmed=decoder.state.get('rf_idle_confirmed'),rf_idle_source=decoder.state.get('rf_idle_source'),autotune_phase=decoder.state.get('autotune_phase'))
  def connect(self):
   with self.lock:
    if not self.simulate and not self.allow_hardware:raise ValueError('Hardware access is disabled. Explicit operator approval is required before launching with --hardware.')
@@ -59,6 +73,7 @@ class Monitor:
    if self.mode_test and self.mode_test_sent:raise ValueError('Mode test already sent a command; reconnecting cannot reauthorize the test')
    if self.power_test and self.power_test_sent:raise ValueError('Power-cycle test already sent a command; reconnecting cannot reauthorize the test')
    if self.readiness_test and self.readiness_test_sent:raise ValueError('Readiness test already sent a command; reconnecting cannot reauthorize the test')
+   if self.tune_test and self.tune_test_counts:raise ValueError('RF tune test already sent a command; reconnecting cannot reauthorize the test')
    if not self.settings['host']:raise ValueError('Set and save the amplifier address before connecting')
    self.stop.clear();self.controls=Controls();self.state={'connection':'Connecting'}
    if self.simulate:
@@ -81,6 +96,14 @@ class Monitor:
    pending={'action':str(action)[:20],'id':str(key)[:100],'source':'DXC' if source=='DXC' else 'standalone'}
    try:
     if self.read_only:raise ValueError('Read-only telemetry: operating and tuning commands are blocked')
+    if self.tune_test:
+     from session_protocol import TuneTestSocket
+     wire={'toggle':b'O','autotune':b'L','autotune-stop':b'8','autotune-exit':b'*'}.get(action)
+     if wire is None or source!='standalone':raise ValueError('RF tune test blocks power and shared controls')
+     if key not in self.controls.seen:
+      if self.tune_test_counts.get(wire,0)>=TuneTestSocket.LIMITS[wire]:raise ValueError('Single RF tune test command allowance exhausted')
+      if action=='toggle' and (expected_mode!=('Standby' if self.tune_test_counts.get(b'O',0)==0 else 'Operate') or self.state.get('status')!=expected_mode):raise ValueError('RF tune test requires Standby -> Operate -> Standby')
+      if action!='toggle' and self.tune_test_counts.get(b'O',0)!=1:raise ValueError('Select Operate before tuning')
     if self.readiness_test:
      if source!='standalone' or action not in ('toggle','autotune','autotune-exit'):raise ValueError('No-RF readiness test blocks power, Stop and all unrelated commands')
      duplicate=isinstance(key,str) and key in self.controls.seen
@@ -118,8 +141,11 @@ class Monitor:
     session=simulated_session(self.simulator,self.stop,self.record_connection)
    else:
     if not self.allow_hardware:raise ValueError('Hardware access is disabled')
-    session=amplifier_session((self.settings['host'],self.settings['port']),self.stop,self.record_connection,read_only=self.read_only,mode_test=self.mode_test,power_test=self.power_test,readiness_test=self.readiness_test)
+    session=amplifier_session((self.settings['host'],self.settings['port']),self.stop,self.record_connection,read_only=self.read_only,mode_test=self.mode_test,power_test=self.power_test,readiness_test=self.readiness_test,trace=self.trace)
    with session as (sock,handshake):
+    if self.tune_test:
+     from session_protocol import TuneTestSocket
+     sock=TuneTestSocket(sock,self.record_connection,self.tune_test_counts)
     if self.readiness_test:
      from session_protocol import ReadinessTestSocket
      if not isinstance(sock,ReadinessTestSocket):sock=ReadinessTestSocket(sock,self.record_connection)
@@ -133,6 +159,7 @@ class Monitor:
      from session_protocol import ReadOnlySocket
      if not isinstance(sock,ReadOnlySocket):sock=ReadOnlySocket(sock,self.record_connection)
     dec.feed(handshake)
+    self.trace_decoded(dec,'handshake')
     # The data timeout starts when session setup completes, not before TCP/setup.
     received=time.monotonic()
     sock.sendall(b'?')
@@ -177,6 +204,7 @@ class Monitor:
      if not data:raise ConnectionError('Amplifier closed the connection')
      revision=dec.measurement_revision;field_revisions=dict(dec.field_revisions)
      updates=dec.feed(data)
+     self.trace_decoded(dec)
      session_replies=[token for token in dec.tokens if token in ('CON','COFF')]
      if session_replies:
       self.record_connection('Remote session update: '+' -> '.join(session_replies))

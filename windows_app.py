@@ -33,35 +33,42 @@ class DisplayBridge:
   if window:
    window.on_top=options['alwaysOnTop']
    if changed:window.resize(*size)
-   window.set_title('OM Power Control · '+('NO-RF READINESS TEST' if getattr(self,'_readiness_test',False) else 'POWER-CYCLE TEST' if getattr(self,'_power_test',False) else 'OPERATE / STANDBY TEST' if getattr(self,'_mode_test',False) else 'READ-ONLY TELEMETRY' if getattr(self,'_read_only',False) else 'SIMULATION' if self._simulated else 'Hardware')+(' · Compact' if small else ''))
+   window.set_title('OM Power Control · '+('OPERATOR RF TUNE TEST' if getattr(self,'_tune_test',False) else 'NO-RF READINESS TEST' if getattr(self,'_readiness_test',False) else 'POWER-CYCLE TEST' if getattr(self,'_power_test',False) else 'OPERATE / STANDBY TEST' if getattr(self,'_mode_test',False) else 'READ-ONLY TELEMETRY' if getattr(self,'_read_only',False) else 'SIMULATION' if self._simulated else 'Hardware')+(' · Compact' if small else ''))
 
 def main(argv=None):
  parser=argparse.ArgumentParser(description=__doc__)
  mode=parser.add_mutually_exclusive_group();mode.add_argument('--simulate',action='store_true',help='Offline simulation (default)');mode.add_argument('--hardware',action='store_true',help='Real amplifier access; requires prior explicit operator approval')
  mode.add_argument('--read-only',action='store_true',help='Real telemetry only; all operating and tuning commands blocked')
+ mode.add_argument('--tune-test',action='store_true',help='One operator-driven RF tune; power commands blocked')
  mode.add_argument('--readiness-test',action='store_true',help='Explicitly authorized no-RF Operate, auto-tune readiness, Exit and Standby only; power blocked')
  mode.add_argument('--power-test',action='store_true',help='Explicitly authorized shutdown then power-on only; no Operate or tuning')
  mode.add_argument('--mode-test',action='store_true',help='Explicitly authorized Operate then Standby only; two mode commands, no power or tuning')
  parser.add_argument('--host',help='Approved amplifier address for this launch')
  parser.add_argument('--amp-port',type=int,help='Amplifier TCP port for this launch')
  parser.add_argument('--smoke-test',action='store_true',help='Exercise the real WebView2 window offline, then exit')
+ parser.add_argument('--trace-telemetry',action='store_true',help='Save private bounded raw amplifier replies and decoder events under local application data')
  args=parser.parse_args(argv)
  if sys.platform!='win32':parser.error('The Windows desktop host requires Windows')
- if args.smoke_test and (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test):parser.error('Smoke tests must be offline')
- if (args.host or args.amp_port is not None) and not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test):parser.error('An amplifier endpoint requires an explicit hardware access mode')
+ if args.smoke_test and (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('Smoke tests must be offline')
+ if (args.host or args.amp_port is not None) and not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('An amplifier endpoint requires an explicit hardware access mode')
  directory=settings.data_directory();directory.mkdir(parents=True,exist_ok=True)
  logging.basicConfig(filename=directory/'windows.log',level=logging.INFO)
  try:lock=InstanceLock(directory/'instance.lock',name=READER_MUTEX)
  except RuntimeError as exc:
   import ctypes
   ctypes.windll.user32.MessageBoxW(None,str(exc),'OM Power Control',0x40);return 1
- server=feed=None;worker=None;monitor=None
+ server=feed=None;worker=None;monitor=None;wire_trace_writer=None
  try:
   import webview
-  simulated=not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test)
+  simulated=not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test)
   if simulated:os.environ.setdefault('OM_SETTINGS_PATH',str(directory/'simulation-settings.json'))
   preferences=load_preferences(directory/'window.json')
-  monitor=Monitor(simulate=simulated,allow_hardware=not simulated,read_only=args.read_only,mode_test=args.mode_test,power_test=args.power_test,readiness_test=args.readiness_test)
+  if args.trace_telemetry:
+   from wire_trace import WireTrace
+   import time
+   wire_trace_writer=WireTrace(directory/('telemetry-trace-'+str(time.time_ns())+'.jsonl'))
+   logging.info('Private telemetry trace: %s',wire_trace_writer.path)
+  monitor=Monitor(simulate=simulated,allow_hardware=not simulated,read_only=args.read_only,mode_test=args.mode_test,power_test=args.power_test,readiness_test=args.readiness_test,tune_test=args.tune_test,trace=wire_trace_writer)
   if args.host or args.amp_port is not None:
    monitor.settings=settings.validate({**monitor.settings,**({'host':args.host} if args.host else {}),**({'port':args.amp_port} if args.amp_port is not None else {})})
   server=create_server(monitor,preferences=preferences)
@@ -70,20 +77,22 @@ def main(argv=None):
    from dxc_feed import start
    try:feed=start(monitor)
    except OSError:logging.exception('DX Caliber feed unavailable')
-  if simulated or monitor.settings['auto_connect'] or ((args.read_only or args.mode_test or args.power_test or args.readiness_test) and monitor.settings['host']):monitor.connect()
+  if simulated or monitor.settings['auto_connect'] or ((args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test) and monitor.settings['host']):monitor.connect()
   bridge=DisplayBridge(directory/'window.json',preferences);bridge._simulated=simulated
   bridge._read_only=args.read_only
   bridge._mode_test=args.mode_test
   bridge._power_test=args.power_test
   bridge._readiness_test=args.readiness_test
+  bridge._tune_test=args.tune_test
   size=(420,790) if preferences.get('compact') else preferences.get('full_size',(900,900))
   url=f'http://127.0.0.1:{server.server_port}/'
+  if args.tune_test:logging.info('Operator RF tune-test service: %s',url)
   if args.read_only:logging.info('Read-only telemetry service: %s',url)
   if args.mode_test:logging.info('Restricted mode-test service: %s',url)
   if args.power_test:logging.info('Restricted power-test service: %s',url)
   if args.readiness_test:logging.info('Restricted readiness-test service: %s',url)
   webview.settings.update(ALLOW_FILE_URLS=False,ALLOW_DOWNLOADS=False,OPEN_EXTERNAL_LINKS_IN_BROWSER=False,OPEN_DEVTOOLS_IN_DEBUG=False)
-  window=webview.create_window('OM Power Control · '+('NO-RF READINESS TEST' if args.readiness_test else 'POWER-CYCLE TEST' if args.power_test else 'OPERATE / STANDBY TEST' if args.mode_test else 'READ-ONLY TELEMETRY' if args.read_only else 'SIMULATION' if simulated else 'Hardware'),url,js_api=bridge,width=size[0],height=size[1],min_size=(380,620),on_top=preferences.get('alwaysOnTop',False),background_color='#111619',text_select=True)
+  window=webview.create_window('OM Power Control · '+('OPERATOR RF TUNE TEST' if args.tune_test else 'NO-RF READINESS TEST' if args.readiness_test else 'POWER-CYCLE TEST' if args.power_test else 'OPERATE / STANDBY TEST' if args.mode_test else 'READ-ONLY TELEMETRY' if args.read_only else 'SIMULATION' if simulated else 'Hardware'),url,js_api=bridge,width=size[0],height=size[1],min_size=(380,620),on_top=preferences.get('alwaysOnTop',False),background_color='#111619',text_select=True)
   bridge._window=window
   def dispatch_display(options):
    from System import Action
@@ -161,6 +170,7 @@ def main(argv=None):
    if worker and worker.is_alive():server.shutdown();worker.join(3)
    server.server_close()
   lock.close()
+  if wire_trace_writer is not None:wire_trace_writer.close()
 
 if __name__=='__main__':
  try:sys.exit(main())

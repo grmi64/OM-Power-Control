@@ -102,6 +102,15 @@ Keep the radio idle throughout. This test must not report successful tuning or
 saved tuning settings; it checks readiness and cancellation only. Return to the
 normal read-only desktop shortcut after completion.
 
+`--tune-test` is an explicitly authorized operator-driven RF acceptance test.
+The normal mode/tuning buttons are enabled; power buttons are disabled and power
+bytes are blocked by both backend and socket policy. The session allows one
+Operate/Standby pair, one two-stage automatic-tuning entry, and at most one Stop
+and Exit for recovery. Fresh-state, RF, acknowledgment and no-retry guards still
+apply. The operator supplies/stops RF; no RF is generated or adjusted by the app.
+DX Caliber sharing is disabled. Reconnecting cannot reset a used test allowance.
+After completion, close this process and return to the read-only shortcut.
+
 Do not launch `windows_app.py --hardware`, `live.py --hardware`, or the packaged
 executable with `--hardware` until the operator has explicitly approved connecting
 to the amplifier. That option permits real Ethernet access and saved auto-connect.
@@ -143,6 +152,15 @@ Windows files live under `%LOCALAPPDATA%\OM Power Control\`:
 - `windows.log`: startup and wrapper diagnostics.
 - `WebView2/`: embedded browser runtime data.
 
+For an authorized diagnostic session, add `--trace-telemetry` to the existing
+launch arguments. This saves exact amplifier receive/transmit bytes and decoded
+events in a timestamped `telemetry-trace-*.jsonl` file in this private application
+data directory. Tracing does not grant hardware access or change command policy;
+`--read-only --trace-telemetry` still permits only session and telemetry requests.
+Each trace is capped at 10 MiB; logging then stops without retrying commands or
+ending the amplifier session. Tracing is off by default. Logs can contain station
+telemetry; keep them private and exclude them from GitHub and portable packages.
+
 `OM_SETTINGS_PATH` overrides the settings file for isolated tests. The current
 development environment was created with the Python 3.12.14 runtime already
 available on this PC; recreating the venv with a standalone Python installation
@@ -165,7 +183,28 @@ shutdown/cooling and power-on/180-second warm-up cycle also returned to confirme
 Standby, with exactly one off/on pair and no retries. One separately authorized
 no-RF readiness/Exit test also confirmed WAITING FOR INPUT POWER, acknowledged
 Exit without a tune/save, and returned to operator-confirmed Standby without
-power commands. An RF-assisted tune has not been authorized or performed.
+power commands. One later operator-driven RF-assisted tune confirmed successful
+completion and automatic saving, operator RF release, and acknowledged Standby.
+Exactly one mode pair and one two-stage tune were sent, without power commands
+or retries. The passive monitor observed a separate brief 3.1-second telemetry-age
+excursion after completion; fresh data returned without reconnecting. See the
+validation report for details.
+The subsequent Ethernet RF retest completed tuning and saving but exposed an
+expired transmit indication that blocked the app's Standby button; the operator
+returned the amplifier to Standby from its front panel. That retest is not a
+full acceptance pass. Expired RF-active indications now show RF state unconfirmed
+and retain the command guard. Successful tuning does not itself confirm RF-off;
+keep RF off and check the amplifier when its RF state is unconfirmed. The cause
+of the missing RF-off indication still needs event capture before another RF test.
+The later raw-traced retest received PTTON but no PTTOFF. Static inspection of
+the official vendor client established its post-save compatibility rule: a fresh
+plate-current change from nonzero to zero ends the transmit indication after a
+saved tune. The shared decoder now implements this narrow rule and successfully
+replays the failed capture. Ordinary zero current and a timer do not clear RF;
+the guard stays active while RF state is unconfirmed. A subsequent authorized
+Ethernet test passed tuning, saving, explicit PTTOFF detection and app-driven
+return to Standby. That run did not exercise the compatibility fallback live;
+its evidence remains the offline replay of the earlier failed capture.
 An RF-output-only check using existing tuning produced approximately 1.2 kW
 forward at 19-20 W input, with 46 W reflected and about 1.49 calculated SWR;
 the operator confirmed matching meters. TX cleared and power returned to zero

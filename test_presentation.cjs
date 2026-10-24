@@ -2,6 +2,8 @@ const assert=require('node:assert/strict');const {amplifierPresentation:p}=requi
 const live={connection:'Connected'};
 for(const [status,kind] of [['Operate','operate'],['Standby','standby'],['Off','off'],['On','waiting'],['Unknown','waiting']])assert.equal(p({...live,status}).kind,kind);
 assert.equal(p({...live,status:'Operate',transmitting:true}).title,'Transmitting');
+assert.equal(p({...live,status:'Operate',transmitting:null,rf_state_unknown:true}).title,'RF state unconfirmed');
+assert.match(p({...live,status:'Standby',transmitting:null,rf_state_unknown:true}).detail,/Standby/);
 assert.equal(p({connection:'Disconnected',status:'Operate',transmitting:true}).title,'Disconnected');
 assert.equal(p({connection:'Stale',status:'Operate',transmitting:true}).kind,'stale');
 assert.equal(p({connection:'Connecting',status:'Operate'}).title,'Connecting');
@@ -21,7 +23,7 @@ for(const status of ['Operate','Standby','On'])assert.equal(c({...live,status}).
 assert.equal(c({...live,status:'Off'}).off.disabled,true);
 assert.equal(c({...live,status:'Off'}).on.disabled,false);
 assert.equal(c({...live,status:'Off'}).toggle.disabled,true);
-for(const extra of [{transmitting:true},{connection:'Stale'},{age_seconds:4},{control:{pending:true}},{control:{uncertain:true}},{control:{cooldown_remaining:1}},{status:'Warming up'},{status:'Cooling down'}]){
+for(const extra of [{transmitting:true},{transmitting:null,rf_state_unknown:true},{connection:'Stale'},{age_seconds:4},{control:{pending:true}},{control:{uncertain:true}},{control:{cooldown_remaining:1}},{status:'Warming up'},{status:'Cooling down'}]){
  const v=c({...live,status:'Standby',...extra});for(const key of ['toggle','on','off'])assert.equal(v[key].disabled,true);assert.ok(v.reason);
 }
 console.log('Control labels and availability checks passed');

@@ -11,6 +11,7 @@ function amplifierPresentation(s) {
   const remaining=n===null?'Waiting for amplifier countdown':Math.floor(n/60)+':'+String(n%60).padStart(2,'0')+' remaining';
   return {kind:mode==='Warming up'?'warming':'cooling',title:mode,detail:remaining+' · reported by amplifier'};
  }
+ if(s.rf_state_unknown)return {kind:'stale',title:'RF state unconfirmed',detail:mode+' · last RF reading is stale; controls paused'};
  if(s.transmitting===true)return {kind:'transmitting',title:'Transmitting',detail:mode==='Operate'?'Operate · RF active':'RF active · mode awaiting confirmation'};
  if(mode==='Operate')return {kind:'operate',title:'Operate',detail:'Amplifier enabled · no transmit indication'};
  if(mode==='Standby')return {kind:'standby',title:'Standby',detail:'Amplifier in standby'};
@@ -31,14 +32,15 @@ function amplifierControls(s,localPending=false){
  else if(c.uncertain)reason='Command result is uncertain. Reconnect to reassess; no retry was sent.';
  else if(localPending||c.pending)reason='Waiting for amplifier confirmation…';
  else if(['entered','waiting','tuning','unknown','aborted'].includes(s.autotune_phase))reason='Automatic tuning active; use its controls below.';
+ else if(s.rf_state_unknown)reason='RF state is unconfirmed. Keep RF off and check the amplifier; controls remain paused.';
  else if(s.transmitting)reason='Stop transmission before changing amplifier state.';
  else if(mode==='Cooling down'||mode==='Warming up')reason='Wait for the amplifier countdown to finish.';
  else if(c.cooldown_remaining>0)reason='Waiting briefly before another command.';
  const disabled=!!reason;
  return {reason,
-  toggle:{label:mode==='Operate'?'Go to Standby':mode==='Standby'?'Go to Operate':'Toggle Operate / Standby',disabled:disabled||mode==='Off',expectedMode:['Operate','Standby'].includes(mode)?mode:null},
-  on:{label:'Power on',disabled:disabled||['On','Operate','Standby'].includes(mode)},
-  off:{label:'Power off',disabled:disabled||mode==='Off'}
+  toggle:{label:mode==='Operate'?'Go to Standby':mode==='Standby'?'Go to Operate':'Toggle Operate / Standby',disabled:disabled||mode==='Off'||!!(s.tune_test&&s.tune_test_counts?.O>=2),expectedMode:['Operate','Standby'].includes(mode)?mode:null},
+  on:{label:'Power on',disabled:disabled||!!s.tune_test||['On','Operate','Standby'].includes(mode)},
+  off:{label:'Power off',disabled:disabled||!!s.tune_test||mode==='Off'}
  };
 }
 if(typeof module!=='undefined')module.exports.amplifierControls=amplifierControls;
@@ -106,13 +108,14 @@ if(typeof module!=='undefined'){module.exports.secondaryMeter=secondaryMeter;mod
 
 function autotunePresentation(s,pending=false){
  const phase=s.autotune_phase||'idle',active=['entered','waiting','tuning','unknown','aborted'].includes(phase),link=s.connection==='Connected'&&!(s.age_seconds>3);
- let reason='';if(s.readiness_test)reason='No-RF readiness test: commands are managed by the test; do not transmit.';else if(s.power_test)reason='Restricted power-cycle test: tuning commands are blocked.';else if(s.mode_test)reason='Restricted Operate/Standby test: tuning commands are blocked.';else if(s.read_only)reason='Read-only telemetry: operating and tuning commands are blocked.';else if(s.settings?.model!=='OM-3501A')reason='Auto-tune is verified only for OM-3501A.';else if(!link)reason='Fresh amplifier communication is required.';else if(pending||s.control?.pending)reason='Waiting for command confirmation.';else if(s.control?.uncertain)reason='Command result uncertain; check amplifier. No retry was sent.';else if(s.transmitting)reason='Stop RF before using tuning controls.';else if(s.control?.cooldown_remaining>0)reason='Please wait before another command.';
+ let reason='';if(s.readiness_test)reason='No-RF readiness test: commands are managed by the test; do not transmit.';else if(s.power_test)reason='Restricted power-cycle test: tuning commands are blocked.';else if(s.mode_test)reason='Restricted Operate/Standby test: tuning commands are blocked.';else if(s.read_only)reason='Read-only telemetry: operating and tuning commands are blocked.';else if(s.settings?.model!=='OM-3501A')reason='Auto-tune is verified only for OM-3501A.';else if(!link)reason='Fresh amplifier communication is required.';else if(pending||s.control?.pending)reason='Waiting for command confirmation.';else if(s.control?.uncertain)reason='Command result uncertain; check amplifier. No retry was sent.';else if(s.rf_state_unknown)reason='RF state is unconfirmed; keep RF off and check the amplifier.';else if(s.transmitting)reason='Stop RF before using tuning controls.';else if(s.control?.cooldown_remaining>0)reason='Please wait before another command.';
  let title={idle:'Automatic tuning',entered:'Preparing auto-tune',waiting:'WAITING FOR INPUT POWER',tuning:'AUTO-TUNE IN PROGRESS',succeeded:'SUCCESSFUL AUTOTUNE!',cancelled:'Auto-tune exited',aborted:'AUTO-TUNE ABORTED',defaults:'Auto-tune exited · defaults restored','stopped-exited':'Stopped tune exited · settings saved',unknown:'Unexpected auto-tune response'}[phase]||'Unexpected auto-tune response';
  let detail={idle:'Operator sets tuning power and supplies the steady carrier.',entered:'Waiting for amplifier readiness.',waiting:'Set the prescribed tuning drive level, then transmit a steady carrier from your radio.',tuning:'Operator controls RF. Stop RF manually if tuning is abnormal.',succeeded:s.autotune_saved?'Amplifier reported settings saved automatically. Stop tuning RF.':'Amplifier reported tuning complete. Stop tuning RF.',cancelled:'Returned from automatic tuning without applying RF.',aborted:s.autotune_abort_origin==='rf_lost'?'RF was released before completion. Exit auto-tune to restore default settings; this was not a successful tune.':s.autotune_abort_origin==='stop'?'Tuning was stopped. Release RF, then use Exit; the amplifier may save its current settings. This is not a successful tune.':'Stop RF manually and check the amplifier. The abort cause is unrecognized.',defaults:'Amplifier reported default settings saved. No successful tune was saved.','stopped-exited':'Amplifier reported user settings saved after Stop. Successful tuning was not confirmed.',unknown:(s.autotune_message||'Unrecognized response')+' · Stop RF and check the amplifier; no retry is sent.'}[phase];
  if(active&&!link){title='Auto-tune result unknown';detail='Communication interrupted. Stop RF manually and check the amplifier.';}
  else if(active&&s.autotune_age_seconds>15){title='Auto-tune status delayed';detail='No recent tuning status. Stop RF manually and check the amplifier; no retry is sent.';}
  if(s.readiness_test)detail='NO-RF TEST: do not transmit. Verify readiness, Exit, then return to Standby; no successful tune is expected.';
+ if(s.rf_state_unknown)detail+=' RF state is unconfirmed; keep RF off and check the amplifier.';
  const stopBlocked=s.read_only||s.mode_test||s.power_test||s.readiness_test||s.settings?.model!=='OM-3501A'||!link||pending||s.control?.pending||s.control?.uncertain||phase!=='tuning';
- return {stopDisabled:!!stopBlocked,phase,title,detail,visible:phase!=='idle',startDisabled:!!reason||active||s.status!=='Operate',exitDisabled:!!reason||(phase!=='waiting'&&!(phase==='aborted'&&['rf_lost','stop'].includes(s.autotune_abort_origin))),reason};
+ return {stopDisabled:!!stopBlocked||!!(s.tune_test&&s.tune_test_counts?.['8']),phase,title,detail,visible:phase!=='idle',startDisabled:!!reason||active||s.status!=='Operate'||!!(s.tune_test&&s.tune_test_counts?.L),exitDisabled:!!reason||!!(s.tune_test&&s.tune_test_counts?.['*'])||(phase!=='waiting'&&!(phase==='aborted'&&['rf_lost','stop'].includes(s.autotune_abort_origin))),reason};
 }
 if(typeof module!=='undefined')module.exports.autotunePresentation=autotunePresentation;
