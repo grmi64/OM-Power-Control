@@ -211,9 +211,33 @@ the operator confirmed matching meters. TX cleared and power returned to zero
 after RF release. Only the Operate/Standby pair was sent, and read-only monitoring
 was restored. A startup telemetry timeout required one session reconnect; see
 the validation report's unresolved reliability observations.
-Windows signing, a clean-PC
-installation test, mixed-DPI/multiple-monitor
-testing and hardware acceptance are still required before a public release.
+A clean Windows Sandbox test of merged main passed offline packaged startup,
+simulated auto-tune, full/compact views, second-instance rejection, clean exit
+and restored compact/always-on-top preferences. The guest had no Python command
+and no network adapters. Mac and Windows normal auto-tune acceptance passed with
+explicit PTTOFF; the missing-message fallback remains offline-replay verified
+only. See WINDOWS-VALIDATION.md for evidence and limits.
+Standard-user execution also passed in the offline Sandbox: the app ran from a
+read-only program folder, completed simulated tuning, saved per-user settings,
+exited cleanly and restored the meter preference on reopening.
+Missing-WebView2 handling passed an offline Sandbox test using a process-only
+empty-runtime override. The local Windows host now checks the bundled loader
+before starting the backend and shows install/repair guidance instead of a blank
+window. Removing the override restored normal simulation. WebView2 was not
+uninstalled and no runtime was downloaded. The preflight/dialog changes and
+their regressions are included in the current Windows release-readiness review.
+Actual Windows 100%, 125%, 150% and 200% full/compact checks passed in a separate
+host simulation profile after a local fix to keep windows inside the current
+monitor's work area. The original Windows scale was restored. The fix and six
+geometry regressions are included in that review. Only one physical monitor
+was available; physical multiple-monitor/mixed-DPI checks remain pending.
+Multiple-monitor checks, redistribution-notice review, and Windows signing
+remain release work. Sandbox does not establish support for other Windows builds.
+Packaged Sandbox tests of unexpected tuning replies, lost telemetry and
+disconnection also passed, including guarded controls and no false success or
+retries. A local simulator-only cleanup fix preserves the original error reason;
+it and its regressions are included in that review. These changes do not require
+additional live RF testing to validate their intended behavior.
 The initial distribution is a portable ZIP, not an installer.
 
 Dependency references: https://pywebview.flowrl.com/guide/installation.html and

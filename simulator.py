@@ -67,4 +67,8 @@ def simulated_session(amplifier,stop,record):
  record('OFFLINE simulation: no amplifier socket opened')
  handshake=establish(amplifier,stop,record)
  try:yield amplifier,handshake
- finally:release(amplifier,record)
+ finally:
+  # Match the hardware session: failed cleanup must not replace the original
+  # telemetry timeout or connection-loss diagnostic.
+  try:release(amplifier,record)
+  except Exception as exc:record('Remote session close: '+str(exc))

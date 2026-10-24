@@ -4,13 +4,41 @@ from pathlib import Path
 import settings
 from instance_lock import InstanceLock,READER_MUTEX
 from live import Monitor,create_server
+from windows_runtime import ensure_webview2_runtime
+
+def show_startup_error(exc):
+ # A packaged windowed app can inherit redirected console handles from a
+ # launcher. Always show its error to the operator, not only in hidden output.
+ if getattr(sys,'frozen',False) or sys.stdout is None:
+  import ctypes
+  ctypes.windll.user32.MessageBoxW(None,str(exc)+'\n\nSee %LOCALAPPDATA%\\OM Power Control\\windows.log','OM Power Control',0x10|0x10000)
+ elif sys.stderr is not None:print(str(exc),file=sys.stderr)
 
 def load_preferences(path):
  try:
   value=json.loads(Path(path).read_text())
   if not isinstance(value,dict):return {}
-  return {k:v for k,v in value.items() if k in ('compact','alwaysOnTop') and type(v) is bool or k=='full_size' and isinstance(v,list) and len(v)==2 and all(type(n) is int and 650<=n<=4000 for n in v)}
+  return {k:v for k,v in value.items() if k in ('compact','alwaysOnTop') and type(v) is bool or k=='full_size' and isinstance(v,list) and len(v)==2 and all(type(n) is int for n in v) and 380<=v[0]<=4000 and 200<=v[1]<=4000}
  except (OSError,ValueError):return {}
+
+def visible_window_bounds(bounds,work_area):
+ """Fit physical window bounds to the current monitor's physical work area."""
+ x,y,width,height=bounds;left,top,available_width,available_height=work_area
+ width=max(1,min(width,available_width));height=max(1,min(height,available_height))
+ return (max(left,min(x,left+available_width-width)),max(top,min(y,top+available_height-height)),width,height)
+
+def keep_window_visible(window):
+ # Called only on the WinForms UI thread. Use one coordinate system for both
+ # rectangles; CSS/pywebview logical dimensions differ at high DPI.
+ from System.Drawing import Rectangle,Size
+ from System.Windows.Forms import Screen,FormWindowState
+ form=window.native
+ if form.WindowState!=FormWindowState.Normal:return
+ area=Screen.FromControl(form).WorkingArea;bounds=form.Bounds
+ scale=form.DeviceDpi/96
+ form.MinimumSize=Size(min(round(380*scale),area.Width),min(round(620*scale),area.Height))
+ fitted=visible_window_bounds((bounds.X,bounds.Y,bounds.Width,bounds.Height),(area.X,area.Y,area.Width,area.Height))
+ if fitted!=(bounds.X,bounds.Y,bounds.Width,bounds.Height):form.Bounds=Rectangle(*fitted)
 
 class DisplayBridge:
  def __init__(self,path,preferences):
@@ -60,6 +88,8 @@ def main(argv=None):
  server=feed=None;worker=None;monitor=None;wire_trace_writer=None
  try:
   import webview
+  runtime_version=ensure_webview2_runtime(Path(webview.__file__).parent)
+  logging.info('WebView2 runtime available: %s',runtime_version)
   simulated=not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test)
   if simulated:os.environ.setdefault('OM_SETTINGS_PATH',str(directory/'simulation-settings.json'))
   preferences=load_preferences(directory/'window.json')
@@ -97,13 +127,19 @@ def main(argv=None):
   def dispatch_display(options):
    from System import Action
    # pywebview 6.2.1 sets TopMost directly; WinForms requires its UI thread.
-   window.native.BeginInvoke(Action(lambda:bridge._apply(options)))
+   def apply():
+    bridge._apply(options);keep_window_visible(window)
+   window.native.BeginInvoke(Action(apply))
   bridge._dispatch=dispatch_display
   def restrict_navigation():
    # WebView2 event runs on the UI thread. Permit only this session's UI.
    def navigating(sender,event):
     if str(event.Uri)!=url:event.Cancel=True
    window.native.webview.NavigationStarting+=navigating
+   from System import Action
+   # Defer until WinForms has applied its suggested DPI rectangle.
+   window.native.DpiChanged+=lambda sender,event:window.native.BeginInvoke(Action(lambda:keep_window_visible(window)))
+   keep_window_visible(window)
   window.events.before_show+=restrict_navigation
   def remember_size():
    if not preferences.get('compact'):preferences['full_size']=[window.width,window.height]
@@ -176,8 +212,5 @@ if __name__=='__main__':
  try:sys.exit(main())
  except Exception as exc:
   logging.exception('Windows host failed')
-  if sys.stdout is not None:print(str(exc),file=sys.stderr)
-  else:
-   import ctypes
-   ctypes.windll.user32.MessageBoxW(None,str(exc)+'\n\nSee %LOCALAPPDATA%\\OM Power Control\\windows.log','OM Power Control',0x10)
+  show_startup_error(exc)
   sys.exit(1)
