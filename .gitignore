@@ -8,3 +8,5 @@ release/
 *.pcapng
 settings.json
 .DS_Store
+build/
+.tmp/
