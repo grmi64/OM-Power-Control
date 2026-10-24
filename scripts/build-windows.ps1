@@ -12,7 +12,7 @@ foreach ($relative in @('build\windows\OM Power Control','dist\windows\OM Power 
     if (-not $generatedPath.StartsWith($project + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Generated path escaped project.' }
     if (Test-Path -LiteralPath $generatedPath) { Remove-Item -LiteralPath $generatedPath -Recurse -Force }
 }
-& .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --name 'OM Power Control' --distpath dist/windows --workpath build/windows --specpath build --add-data "$project\live.html;." --add-data "$project\presentation.js;." --add-data "$project\LICENSE;." --add-data "$project\ThirdPartyNotices;ThirdPartyNotices" --collect-all webview --hidden-import clr_loader --hidden-import pythonnet --copy-metadata pywebview --copy-metadata pythonnet windows_app.py
+& .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onedir --windowed --manifest "$project\windows_app.manifest" --name 'OM Power Control' --distpath dist/windows --workpath build/windows --specpath build --add-data "$project\live.html;." --add-data "$project\presentation.js;." --add-data "$project\LICENSE;." --add-data "$project\ThirdPartyNotices;ThirdPartyNotices" --collect-all webview --hidden-import clr_loader --hidden-import pythonnet --copy-metadata pywebview --copy-metadata pythonnet windows_app.py
 if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed.' }
 Copy-Item -LiteralPath WINDOWS.md -Destination 'dist/windows/OM Power Control/README-Windows.txt'
 Copy-Item -LiteralPath WINDOWS-VALIDATION.md -Destination 'dist/windows/OM Power Control/'

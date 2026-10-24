@@ -1,4 +1,14 @@
-# Windows preview validation — October 23, 2026
+# Windows preview validation — October 23–24, 2026
+
+Current review scope: simulator cleanup diagnostics, Windows WebView2 startup
+preflight/error delivery, high-DPI window bounds, and the offline acceptance
+results below. These changes are being submitted on a review branch; no public
+release or merge is authorized. Latest validation: 170 Python tests completed
+(164 passed, six expected skips) and all five JavaScript suites passed. All new
+acceptance work used simulation without amplifier access. Physical multiple-
+monitor testing, redistribution-notice review and signing remain release work.
+References to local/unpublished changes in the dated sections describe their
+status when those tests were recorded, before this review submission.
 
 Local source: df916b9, based on public release v0.1.31. The release tag resolves
 to 64bfb6d122135f3c6faddbd4e5ec6f310d310336; the default branch differs only in
@@ -11,7 +21,7 @@ the development toolchain; no global/system package installation was performed.
 
 ## Completed checks
 
-- Python discovery: 142 tests, 136 passed, six optional private-capture tests skipped.
+- Latest Python discovery: 170 tests, 164 passed, six expected skips.
 - Operator-driven RF-tune scope: offline tests verify one mode pair and one
   two-stage tune, socket/backend rejection of power and extra commands,
   no command-budget reset on reconnect, simulated operator RF ownership,
@@ -444,6 +454,280 @@ headless Edge attempt returned no DOM output, so rendered compact/full-view
 confirmation remains for the Mac agent's follow-up. No hardware was used for
 this UI change.
 
+## Completed Mac acceptance and merged Windows rebuild
+
+The operator subsequently reported successful Mac review on exact commit
+2c08ea240eb56c23fb7e0c03faceca461d0d903e: 138 Python tests passed with four
+expected skips, all five JavaScript suites passed, and the separate Apple
+Silicon review app rebuilt successfully. Full/compact simulation labels and RF
+controls were visible and usable; read-only notices remained visible with
+operating controls disabled. The production app and settings were unchanged.
+
+The authorized Mac read-only hardware check passed five minutes with maximum
+telemetry age 1.0 second and three reconnect cycles observed for over 16 seconds
+each. The operator reported matching front-panel readings, no errors, stale
+states, RF or mode changes, and clean session release in Standby. Sharing and
+all operating/tuning/power controls remained disabled.
+
+The separately authorized Mac auto-tune retry confirmed Operate, successful
+tuning, SAVE USER, explicit PTTOFF after operator RF release, zero power readings,
+and acknowledged app-driven Standby. No power commands or retries were sent;
+the session released cleanly and the process exited. These Mac hardware results
+are operator/Mac-agent reports. The missing-PTTOFF fallback was not exercised
+live on either successful platform run; it remains verified by offline replay
+only.
+
+PR #2 was merged with operator approval as
+f7fff4b0c2ae1bdcaf30cc8c2886e3543cefc041. The Windows package was rebuilt from
+that clean main checkout. All 142 Python tests completed (136 passed, six
+expected skips) and all five JavaScript suites passed. A 15-second packaged
+read-only check confirmed Standby, no RF, maximum telemetry age 1.1 seconds,
+and no operating commands. The read-only shortcut targets the rebuilt EXE.
+
+## Offline clean-PC Sandbox acceptance - October 24, 2026
+
+The portable ZIP built from merged main f7fff4b0c2ae1bdcaf30cc8c2886e3543cefc041
+was tested in a fresh Windows Sandbox guest, Windows build 26100. Package SHA256:
+`465878bcbef4408d04b8517e4dac6304996da9c48cd9d04abf573a1a4d8b01db`.
+
+The .wsb configuration disabled networking, clipboard, microphone, camera and
+printer redirection. Only the prepared package/checklist/scripts folder was
+mapped read-only, with a separate writable folder for diagnostic output. The
+guest reported zero network adapters, no python.exe command, and a matching
+package checksum. The complete ZIP was extracted into the guest desktop; the
+packaged EXE was launched explicitly with --simulate. Its localhost backend
+confirmed connected simulation, Standby, and disabled DX Caliber sharing.
+
+The operator reported successful full/compact views, visible simulation labeling
+and RF controls, resizing, always-on-top, and a complete simulated auto-tune,
+save, RF release and return to Standby. The agent then observed the expected
+second-instance rejection without disturbing the first app. The first app exited
+with code 0. Reopening through the simulation-only shortcut restored compact
+view and the checked Stay on top preference; the SIMULATION badge, offline
+warning and simulated Standby remained visible. No amplifier connection or
+hardware commands were used. The app and Sandbox were left open for further
+offline checks.
+
+Preference persistence was checked within one Sandbox session, not after guest
+disposal. Window-position restoration was not claimed. This baseline used the
+administrator Sandbox account; see the later standard-user check below. This
+does not establish compatibility with other Windows builds, missing-WebView2
+behavior, Internet-download reputation, signing, or mixed-DPI/multiple-monitor
+behavior. No runtime installation was needed during this baseline test, but the
+test did not establish behavior when prerequisites are absent.
+
+Private setup, guest startup/exit logs and the observation assessment are under
+ignored `.tmp/clean-pc-test/`. No source, production settings or developer
+environment was mapped into the guest. The subsequent failure and standard-user
+checks are recorded below. Further offline release checks include dependency-
+failure feedback, display scaling, and package/notice review. Keep all further
+checks in simulation unless separately authorized.
+
+## Sandbox simulated failure cases - October 24, 2026
+
+The three packaged-app scenarios were exercised in the same network-disabled
+Sandbox through its local app API, with simulated mode verified before each
+action and no active guest network adapter. No amplifier connection was made.
+Unexpected tuning replies produced phase unknown and no saved success. Lost
+telemetry became Stale at age 3.1 seconds, then Disconnected after the receive
+timeout. Simulated connection loss produced Disconnected. The visible UI showed
+Auto-tune result unknown on communication loss, unavailable readings and disabled
+controls; an aged unexpected-result warning instructed the operator to stop RF
+and stated that no retry was sent.
+
+The initial package exposed a simulator-only diagnostic defect: a failure in
+session release replaced the original timeout/disconnect error. The hardware
+session already records cleanup errors separately. The local simulator now does
+the same, preserving the original error and recording unconfirmed cleanup in
+connection history. Two offline regressions cover preservation of primary
+exceptions and cleanup failure after a normal session body.
+
+The rebuilt local preview passed all 144 Python tests (138 passed, six expected
+skips) and all five JavaScript suites. All three packaged Sandbox retests passed:
+unexpected reply remains unknown/unsaved; silent telemetry retains No amplifier
+data for 10 seconds; disconnection retains Amplifier closed the connection.
+Backend attempts to change mode or start another tune were rejected in every
+failure state, with no extra sends/retries. Shared presentation functions checked
+against the actual captured states keep mode/power/start controls disabled and
+never report success. Simulation was then reset to connected Standby with RF off;
+the guest app and Sandbox remain open.
+
+Retest package SHA256:
+`74865bde1028b4abef9c4d34f1eb5a03824e4415ba8470a91b182140359d5c11`.
+This package includes the local simulator-only fix beyond merged main; it is
+not an unchanged build of f7fff4b. Private baseline/retest captures and package
+provenance are under `.tmp/clean-pc-test/results/`. The fix and documentation
+remain uncommitted and unpublished pending further review.
+
+## Sandbox standard-user execution - October 24, 2026
+
+A disposable local account was created only inside the existing network-disabled
+Sandbox. Its membership was limited to Users, not Administrators. The runner's
+Windows identity/token check confirmed a non-administrator account, and the
+guest process-owner query independently confirmed the packaged app belonged to
+that account. No host account or production setting was changed.
+
+The same local simulator-fix package (SHA256
+`74865bde1028b4abef9c4d34f1eb5a03824e4415ba8470a91b182140359d5c11`)
+was extracted into a guest folder with Users read/execute permission. An actual
+write attempt by the standard user was denied. The app started with --simulate,
+created its settings in that user's LOCALAPPDATA, saved the selected input-meter
+preference, completed simulated Operate/tune/SAVE USER/RF-off/Standby, and exited
+with code 0. Reopening restored the meter preference. The app was visibly usable
+and showed the SIMULATION badge/offline warning after reopening. Final backend
+state was connected simulation, Standby, transmitting false. No elevation was
+requested by the app.
+
+Administrative work was confined to provisioning the guest account/test folders
+and launching a standard-user runner through Secondary Logon. That runner used
+its own token's profile paths to avoid inheriting the administrator's environment.
+The app itself ran without administrator rights and could not write its program
+folder. The account's temporary random password was kept in process memory, not
+exported to the host. The account/profile disappear when Sandbox is disposed.
+
+Private evidence: `.tmp/clean-pc-test/results/standard-user*.json`. Native window
+preference persistence had been tested in the prior administrator session; the
+standard-user reopen check verified the selected meter preference. This check
+does not establish behavior with missing runtimes, other Windows versions, or
+installation into Program Files. The standard-user app and Sandbox remain open,
+offline in simulated Standby.
+
+## Sandbox missing-WebView2 handling - October 24, 2026
+
+The guest had WebView2 Evergreen 156.0.4314.42 installed and zero network adapters.
+The runtime was not uninstalled, renamed or modified. A process-local
+WEBVIEW2_BROWSER_EXECUTABLE_FOLDER override pointed only the test process at an
+empty guest folder. The bundled Microsoft loader reported a valid installed
+version normally, then HRESULT 0x80070002 and no version both for the explicit
+empty folder and for default discovery under that override. This tests runtime
+unavailability; it is not a claim of testing a Windows image with no runtime
+installed.
+
+The baseline packaged app opened a blank window, with initialization failure
+only in its log. A new Windows-only loader preflight now runs before Monitor,
+localhost server or any amplifier connection is created. Runtime unavailability
+raises actionable install/repair guidance, an official download address and the
+log location. Missing loader files instead explain extracting the entire ZIP
+with its _internal folder. No automatic download, installation or browser launch
+occurs. The native version-string allocation is freed on success and failure.
+
+An initial preflight-only package exited before a visible dialog was observed;
+the operator confirmed they had not dismissed one. Packaged startup failures
+now always use the native Windows error dialog even if a launcher supplies
+redirected console handles. The final dialog was visually verified in Sandbox,
+including its install/repair guidance and No amplifier connection was started
+message. While the dialog was open the process had zero local listeners. After
+OK it exited with code 1. The instance lock was released and normal startup
+without the process override passed: connected simulation, Standby, RF off.
+
+Seven new offline tests cover successful version lookup, missing runtime,
+empty/null version, native allocation cleanup, missing loader, preflight before
+Monitor/server creation and packaged dialog delivery. The full rebuilt package
+passed 151 Python tests (145 passed, six expected skips) and all five JavaScript
+suites. Final package SHA256:
+`d6939da6c62f604d4bfff70060dda4a8ff94f038620ae854d766db4bf437054d`.
+It includes local simulator-cleanup and runtime-preflight/error-dialog fixes
+beyond merged main; these changes are uncommitted and unpublished. Evidence is
+private under `.tmp/clean-pc-test/results/missing-webview2-*`,
+`runtime-retest-package.json` and `runtime-recovery.json`. Sandbox and its app
+remain open in offline simulation. Host runtime/account settings were untouched.
+
+## Single-monitor Windows scaling checks - October 24, 2026
+
+The host has one physical 1920x1200 display, originally at the recommended 125%
+Windows scale. The operator has no second monitor, so physical cross-monitor
+movement, mixed-DPI monitor pairs, monitor removal and secondary-screen restore
+remain pending. Unit cases with virtual work-area coordinates do not replace
+those physical tests.
+
+Sandbox exposed one virtual screen at 96 DPI and no Display scaling controls.
+A renderer-only diagnostic attempt could not obtain a local WebView2 debugging
+target; its matrix did not execute and is not counted as a pass. Normal offline
+Sandbox simulation was restored without diagnostic flags. Actual Windows scale
+checks were then performed on the host using the packaged EXE with --simulate
+and a separate LOCALAPPDATA profile under ignored `.tmp/display-test-profile/`.
+Normal app settings were not used or changed. No amplifier connection was made.
+
+Visual checks covered actual Windows 100%, 125%, 150% and 200% settings, full and
+compact views, simulation warnings and RF controls, and navigation to lower
+controls by scrolling. An initial high-DPI test found that fixed view sizes
+could exceed the monitor work area. The local Windows wrapper now fits its
+native window bounds and minimum size to the current monitor's work area at
+startup, full/compact switches and DPI changes, using matching physical units.
+Short but valid saved full-view heights are also accepted. Maximized windows
+are left to Windows. Six new offline geometry regressions cover oversized
+windows, negative-coordinate work areas, removed-monitor positions, unchanged
+visible windows and restoration of short full-view preferences.
+
+The rebuilt app passed visual full/compact checks at all four scales, including
+the live scale transitions, a fresh compact launch at 200%, and reachable lower
+controls at 200%. No overlapping labels or controls were observed after the fix;
+simulation labeling remained visible. The original 125% Windows scale and
+1920x1200 resolution were verified restored. The isolated app's localhost state
+confirmed connected simulation, Standby and RF off; the host test app was then
+closed. The Sandbox remains open in offline simulation.
+
+The rebuild passed all 157 Python tests (151 passed, six expected skips) and all
+five JavaScript suites. Package SHA256:
+`e99c0ee2440e788c584c6b2efe5ff5ed10c0c60dd4969debed46ecc2d742530f`.
+This is a local build with simulator, runtime and window-sizing fixes beyond
+merged main; source/documentation changes are still uncommitted and unpublished.
+Private evidence: `.tmp/clean-pc-test/results/host-display-scaling.json` and
+`host-display-final-state.json`. Physical multiple-monitor validation remains a
+release limitation, not a successful test.
+
+## PR #3 DPI review corrections - October 24, 2026
+
+Review of 5121454 found two integration gaps that the earlier visual scaling
+checks and pure geometry tests did not detect. An isolated native probe measured
+system awareness (1), WinForms DeviceDpi 96 and actual HWND DPI 120. Resetting the
+minimum size from DeviceDpi reduced the intended 380-logical-pixel width to 304.
+The managed DpiChanged event also was not a reliable delivery path: pythonnet's
+untargeted .NET Framework domain leaves DPI-message handling disabled.
+
+The Windows package now embeds a PerMonitorV2/asInvoker manifest. Source launches
+explicitly set and verify PerMonitorV2 before creating any GUI, instance lock or
+Monitor. An already configured manifest is accepted only after verification;
+system awareness or setup failure is rejected before backend creation. Minimum
+size uses GetDpiForWindow rather than the cached WinForms property.
+
+A native common-controls window subclass receives WM_DPICHANGED directly,
+independent of the disabled managed event. It forwards normal message processing,
+then applies the suggested monitor rectangle on the UI thread, updating the
+minimum first so an old high-DPI minimum cannot block a smaller low-DPI window.
+The callback is retained for the HWND lifetime and removed on WM_NCDESTROY;
+callback failures are logged instead of escaping across the native boundary.
+No machine-wide .NET configuration or Windows display setting was changed for
+this follow-up. An attempted app-domain configuration was not effective and is
+not included in the implementation.
+
+Thirteen new offline regressions cover setup/verification, manifest declaration,
+early startup rejection, actual-HWND minimum sizing despite DeviceDpi 96,
+high-to-low minimum ordering, native notification delivery/forwarding, callback
+failure and subclass cleanup. The full suite completed 170 Python tests
+(164 passed, six expected skips), plus all five JavaScript suites.
+
+The packaged --smoke-test now checks the actual HWND's PerMonitorV2 context and
+minimum size, delivers a synthetic current-DPI WM_DPICHANGED message through
+the installed native hook, then exercises the existing simulated UI tune/save/
+RF-off flow and clean shutdown. The final host run passed at HWND DPI 120 with
+minimum 475x775 and exit code 0. Embedded resource inspection independently
+verified PerMonitorV2 and asInvoker. Synthetic message delivery is not a claim
+of physical cross-monitor movement or a real DPI transition.
+
+The final package was also checked in a fresh network-disabled Sandbox using
+an exact-checksum match: PerMonitorV2, HWND DPI 120, minimum 475x775, native
+notification delivered, simulated UI smoke passed and exit code 0. Tested ZIP
+SHA256: `a169918a90acc4dac0d6d05187cda60457fe117813eb8ae81556c312f8238cec`.
+Private evidence is under
+`.tmp/clean-pc-test/results/dpi-fix-package.json` and `dpi-fix-package.log`;
+the native source probe is `.tmp/pr3-dpi-fixed-awareness.json`. Earlier Sandbox
+results from intermediate packages are retained separately and are not counted
+as final-package evidence. Physical multiple-monitor/mixed-DPI testing remains
+pending; the missing-PTTOFF fallback remains offline-replay verified only. No
+amplifier connection, real hardware command or RF test was performed; all
+operating/tuning actions were in simulation.
+
 ## Files and commands
 
 Run the desktop app from `dist/windows/OM Power Control/OM Power Control.exe`.
@@ -455,6 +739,6 @@ attributes OneDrive assigns to generated directories; cleanup is confined to
 the two named generated build/output directories under this repository.
 
 The initial Windows port and shared reconnect changes were merged in PR #1.
-The operator-driven tune-test policy and these additional results remain local
-pending review. The existing Mac release has not been updated. Local binaries,
+The shared RF-off changes and operator-driven tune-test policy were merged in
+PR #2. The existing Mac release has not been updated. Local binaries,
 station settings and private diagnostic traces are excluded from Git.
