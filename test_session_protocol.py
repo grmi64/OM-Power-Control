@@ -21,6 +21,25 @@ class Tests(unittest.TestCase):
   s=Socket([b''])
   with self.assertRaises(ConnectionError):establish(s,threading.Event())
   self.assertEqual(s.sent,[b'C'])
+ def test_latest_coalesced_session_reply_controls_establishment(self):
+  s=Socket([b'CON;COFF;',b'CON;'])
+  self.assertEqual(establish(s,threading.Event()),b'CON;COFF;CON;')
+  self.assertEqual(s.sent,[b'C',b'C'])
+ def test_fragmented_later_off_reply_is_not_ignored(self):
+  s=Socket([b'CON;CO',b'FF;',b'CON;'])
+  self.assertEqual(establish(s,threading.Event()),b'CON;COFF;CON;')
+  self.assertEqual(s.sent,[b'C',b'C'])
+ def test_latest_coalesced_reply_controls_release(self):
+  s=Socket([b'COFF;CON;',b'COFF;']);release(s)
+  self.assertEqual(s.sent,[b'C',b'C'])
+ def test_coalesced_final_on_reply_does_not_toggle_again(self):
+  s=Socket([b'COFF;CON;'])
+  self.assertEqual(establish(s,threading.Event()),b'COFF;CON;')
+  self.assertEqual(s.sent,[b'C'])
+ def test_incomplete_later_reply_does_not_accept_an_earlier_on(self):
+  s=Socket([b'CON;CO',b''])
+  with self.assertRaises(ConnectionError):establish(s,threading.Event())
+  self.assertEqual(s.sent,[b'C'])
  def test_clean_close(self):
   s=Socket([b'PTTOFF;CO',b'FF;']);release(s);self.assertEqual(s.sent,[b'C'])
  def test_close_normalizes_only_on_explicit_on(self):

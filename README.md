@@ -1,5 +1,17 @@
 # OM Power Control
 
+Windows development preview: see [WINDOWS.md](WINDOWS.md) for setup, the native
+WebView2 desktop host, portable packaging and offline simulation. Windows starts
+in simulation; real amplifier access requires separate explicit operator approval.
+
+Both desktop hosts use the same Python backend and HTML/JavaScript interface.
+`Sources/` and `scripts/build.sh` provide the macOS host/build; `windows_app.py`
+and `scripts/build-windows.ps1` provide the Windows host/build. Keep shared
+protocol fixes in this repository so both builds receive them. The Mac host
+explicitly selects hardware mode and retains its saved auto-connect preference;
+direct backend launches default to offline simulation. New Mac builds from this
+checkout still require macOS build and reconnect validation.
+
 An independent, open-source macOS controller for the OM Power OM-3501A amplifier over its Ethernet interface. It is not an official OM Power product and is not affiliated with or endorsed by the manufacturer.
 
 The first public build is intended as a beta. Hardware verification so far covers one OM-3501A; compatibility with other models or firmware revisions is not claimed.

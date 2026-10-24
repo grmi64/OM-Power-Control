@@ -72,7 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKSc
     func launchReader() {
         guard let resources = Bundle.main.resourceURL else { return }
         let task = Process(); task.executableURL = resources.appendingPathComponent("amp-engine/amp-engine")
-        let args = ["--port","0"]
+        // The shared backend defaults to simulation; preserve this host's real-device mode.
+        let args = ["--hardware","--port","0"]
         task.arguments = args
         task.environment = ProcessInfo.processInfo.environment.merging(["PYTHONDONTWRITEBYTECODE":"1","PYTHONUNBUFFERED":"1"]) { _,new in new }
         let pipe = Pipe(); task.standardOutput = pipe

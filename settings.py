@@ -1,7 +1,11 @@
-import json,os,re,tempfile
+import json,os,re,tempfile,sys
 from pathlib import Path
 DEFAULTS={'host':'','port':10001,'auto_connect':False,'callsign':'','model':'OM-3501A','secondary_measurement':'reflected','share_dxc':False}
-def location():return Path(os.environ.get('OM_SETTINGS_PATH',str(Path.home()/'Library/Application Support/OM3501A Control/settings.json')))
+def data_directory():
+ if sys.platform=='win32':return Path(os.environ.get('LOCALAPPDATA',str(Path.home()/'AppData/Local')))/'OM Power Control'
+ return Path.home()/'Library/Application Support/OM3501A Control'
+
+def location():return Path(os.environ.get('OM_SETTINGS_PATH',str(data_directory()/'settings.json')))
 def validate(value):
  if not isinstance(value,dict):raise ValueError('Invalid connection settings')
  host=str(value.get('host','')).strip();callsign=str(value.get('callsign','')).strip().upper()
