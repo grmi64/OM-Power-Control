@@ -14,6 +14,20 @@ class ReadOnlySocket:
   self._record('Read-only request: '+data.decode('ascii'));return self._sock.sendall(data)
  def recv(self,size):return self._sock.recv(size)
 
+class TuneTestSocket(ReadOnlySocket):
+ """One operator-driven tune with an Operate/Standby pair; power is forbidden."""
+ LIMITS={b'O':2,b'L':1,b'&':1,b'8':1,b'*':1}
+ def __init__(self,sock,record=lambda event:None,counts=None):
+  super().__init__(sock,record);self.counts=counts if counts is not None else {}
+ def sendall(self,data):
+  if data in self.ALLOWED:return super().sendall(data)
+  if data not in self.LIMITS or self.counts.get(data,0)>=self.LIMITS[data]:raise ValueError('RF tune test blocks power, extra tuning and repeated commands')
+  if data!=b'O' and self.counts.get(b'O',0)!=1:raise ValueError('Select Operate once before the single tune')
+  if data==b'&' and self.counts.get(b'L',0)!=1:raise ValueError('Automatic mode must be selected first')
+  if data in (b'8',b'*') and self.counts.get(b'&',0)!=1:raise ValueError('Automatic tuning must be prepared first')
+  self.counts[data]=self.counts.get(data,0)+1
+  self._record('RF tune-test request: '+data.decode('ascii'));return self._sock.sendall(data)
+
 class ModeTestSocket(ReadOnlySocket):
  """One authorized Operate/Standby pair; no power or tuning bytes."""
  def __init__(self,sock,record=lambda event:None):super().__init__(sock,record);self.toggles=0
@@ -80,10 +94,13 @@ def release(sock,record=lambda event:None):
  record('Remote session disconnected (COFF)')
 
 @contextmanager
-def amplifier_session(endpoint,stop,record=lambda event:None,read_only=False,mode_test=False,power_test=False,readiness_test=False):
+def amplifier_session(endpoint,stop,record=lambda event:None,read_only=False,mode_test=False,power_test=False,readiness_test=False,trace=None):
  if sum(map(bool,(read_only,mode_test,power_test,readiness_test)))>1:raise ValueError('Choose one amplifier access policy')
  with socket.create_connection(endpoint,timeout=3) as sock:
   sock.settimeout(.2);record('TCP connected')
+  if trace is not None:
+   from wire_trace import TracedSocket
+   sock=TracedSocket(sock,trace)
   if readiness_test:sock=ReadinessTestSocket(sock,record)
   elif power_test:sock=PowerCycleTestSocket(sock,record)
   elif mode_test:sock=ModeTestSocket(sock,record)

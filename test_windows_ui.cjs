@@ -9,6 +9,7 @@ vm.runInContext(script,ctx);
 (async()=>{
  await new Promise(r=>setImmediate(r));
  assert.equal(nodes.simulationPanel.hidden,false);assert.equal(nodes.shareDXC.disabled,true);
+ assert.equal(nodes.badge.textContent,'SIMULATION');assert.equal(nodes.simRFOff.disabled,false);
  assert.equal(nodes.view.textContent,'Full view');assert.equal(nodes.onTop.checked,true);
  assert.equal(native.at(-1).compact,true);listeners.pywebviewready();
  nodes.view.onclick();assert.equal(native.at(-1).compact,false);
@@ -36,5 +37,13 @@ vm.runInContext(script,ctx);
  assert.match(nodes.readOnlyPanel.textContent,/Keep the radio idle/);assert.match(nodes.autotuneDetail.textContent,/do not transmit/);
  for(const id of ['toggle','on','off','autotuneStart','autotuneExit','autotuneStop']){assert.equal(nodes[id].disabled,true,id);await nodes[id].onclick();}
  assert.equal(posts.length,beforeControls,'No-RF test UI must not submit extra commands');
- console.log('Windows UI: preferences, native bridge, simulated RF controls and visible simulation label pass.');
+ state={...state,readiness_test:false,tune_test:true,tune_test_counts:{},status:'Standby',autotune_phase:null};await vm.runInContext('refresh()',ctx);
+ assert.match(nodes.readOnlyPanel.textContent,/One tune only/);
+ assert.equal(nodes.toggle.disabled,false);assert.equal(nodes.on.disabled,true);assert.equal(nodes.off.disabled,true);
+ state={...state,status:'Operate'};await vm.runInContext('refresh()',ctx);assert.equal(nodes.autotuneStart.disabled,false);
+ state={...state,tune_test_counts:{O:1,L:1,'&':1},autotune_phase:'tuning',transmitting:true};await vm.runInContext('refresh()',ctx);
+ assert.equal(nodes.autotuneStop.disabled,false);assert.equal(nodes.toggle.disabled,true);assert.equal(nodes.off.disabled,true);
+ state={...state,tune_test_counts:{O:2,L:1,'&':1},autotune_phase:'succeeded',status:'Standby',transmitting:false};await vm.runInContext('refresh()',ctx);
+ assert.equal(nodes.toggle.disabled,true);assert.equal(nodes.autotuneStart.disabled,true);
+ console.log('Windows UI: preferences, native bridge, simulation, restricted tests and operator RF-tune scope pass.');
 })().catch(e=>{console.error(e);process.exitCode=1});

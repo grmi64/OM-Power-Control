@@ -10,3 +10,4 @@ settings.json
 .DS_Store
 build/
 .tmp/
+telemetry-trace-*.jsonl

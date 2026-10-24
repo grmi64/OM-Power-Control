@@ -31,7 +31,7 @@ body.compact .operating{margin-top:10px;gap:6px;grid-template-columns:minmax(0,1
 body.compact .operating button{height:32px;padding:5px 8px;font-size:12px;line-height:20px;white-space:nowrap}
 body.compact #toggle{grid-column:1/3}
 body.compact #commandMessage{height:45px;min-height:45px;margin:6px 0 0;font-size:11px;line-height:15px;overflow-wrap:anywhere}
-body.compact .panel,body.compact .foot{display:none}
+body.compact .panel:not(#simulationPanel):not(#readOnlyPanel),body.compact .foot{display:none}
 
 .badge{min-width:112px;justify-content:center}.badge[data-kind=waiting],.badge[data-kind=stale]{color:var(--amber);border-color:#806d46}
 .connectionLine{height:26px;margin-bottom:10px;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12px;--link-color:var(--muted)}
@@ -76,7 +76,7 @@ body.compact .telemetryStrip{margin:6px 0;height:24px}body.compact .frequencyVal
 __PRESENTATION__
 /*__NATIVE_PREFERENCES__*/
 const $=id=>document.getElementById(id);let pending=false,localFeedback='';
-function renderSimulation(s){$('readOnlyPanel').hidden=!(s.read_only||s.mode_test||s.power_test||s.readiness_test);$('readOnlyPanel').textContent=s.readiness_test?'NO-RF READINESS TEST · Keep the radio idle. Power commands are blocked.':s.power_test?'POWER-CYCLE TEST · '+s.power_test_sent+'/2 power commands sent. Operate and tuning are blocked.':s.mode_test?'OPERATE / STANDBY TEST · '+s.mode_test_sent+'/2 mode commands sent. Power and tuning are blocked.':'READ-ONLY TELEMETRY · Operating and tuning commands are blocked.';$('simulationPanel').hidden=!s.simulated;$('shareDXC').disabled=!!(s.simulated||s.read_only||s.mode_test||s.power_test||s.readiness_test);if(s.simulated){$('simRFState').textContent='Simulated RF '+(s.transmitting?'ON — operator must stop RF':'off');$('simRFOn').disabled=s.connection!=='Connected'||s.transmitting;$('simRFOff').disabled=s.connection!=='Connected';}}
+function renderSimulation(s){$('readOnlyPanel').hidden=!(s.read_only||s.mode_test||s.power_test||s.readiness_test||s.tune_test);$('readOnlyPanel').textContent=s.tune_test?'OPERATOR RF TUNE TEST · One tune only. You control RF. Power commands blocked.':s.readiness_test?'NO-RF READINESS TEST · Keep the radio idle. Power commands are blocked.':s.power_test?'POWER-CYCLE TEST · '+s.power_test_sent+'/2 power commands sent. Operate and tuning are blocked.':s.mode_test?'OPERATE / STANDBY TEST · '+s.mode_test_sent+'/2 mode commands sent. Power and tuning are blocked.':'READ-ONLY TELEMETRY · Operating and tuning commands are blocked.';$('simulationPanel').hidden=!s.simulated;$('shareDXC').disabled=!!(s.simulated||s.read_only||s.mode_test||s.power_test||s.readiness_test||s.tune_test);if(s.simulated){$('simRFState').textContent='Simulated RF '+(s.transmitting?'ON — operator must stop RF':'off');$('simRFOn').disabled=s.connection!=='Connected'||s.transmitting;$('simRFOff').disabled=s.connection!=='Connected';}}
 async function simulationRF(rf){try{await action('/simulation',{rf,scenario:$('simScenario').value})}catch(e){$('simRFState').textContent=e.message}}
 $('simRFOn').onclick=()=>simulationRF(true);$('simRFOff').onclick=()=>simulationRF(false);
 async function action(path,body){const r=await fetch(path,{method:'POST',headers:{'X-OM-Token':'__TOKEN__','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const v=await r.json();if(!r.ok)throw Error(v.error||'Request failed')}

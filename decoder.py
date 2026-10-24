@@ -27,16 +27,28 @@ def packets(path,host=None,port=10001):
             yield ((hi<<32)|lo)*res,(src,sp,dst,dp),seq,payload
 
 class Decoder:
-    def __init__(self):self.tokens=[];self.measurement_revision=0;self.field_revisions={};self.buffer=b'';self.state={ 'status':'Unknown','transmitting':False,'forward':None,'reflected':None,'swr':None }
+    def __init__(self):
+        self.tokens=[];self.measurement_revision=0;self.field_revisions={};self.buffer=b'';self.state={ 'status':'Unknown','transmitting':False,'forward':None,'reflected':None,'swr':None }
+        self._last_plate_current=None;self._saved_tune_release=False;self._tune_save_seen=False
+
+    def confirm_rf_idle(self,source):
+        self._saved_tune_release=False;self.measurement_revision+=1;self.mark('rf')
+        self.state.update(transmitting=False,rf_idle_confirmed=True,rf_idle_source=source,forward=0,reflected=0,swr=None,input=0,gain_db=None)
     def feed(self,data):
         self.tokens=[];self.buffer+=data; updates=[]
         while self.buffer:
+            # Idle NUL bytes occur between replies. Never strip bytes within a
+            # binary frame or inside an ASCII token: both must retain framing.
+            if self.buffer[0]==0:
+                self.buffer=self.buffer.lstrip(b'\x00');continue
             if self.buffer[0]==61:
                 if len(self.buffer)<10:break
                 if self.buffer[9]!=59:raise ValueError('Malformed binary measurement')
                 v=self.buffer[1:9];self.buffer=self.buffer[10:]
                 self.measurement_revision+=1
+                self.mark('rf')
                 self.state['rf_idle_confirmed']=False
+                self.state['rf_idle_source']=None
                 f=int.from_bytes(v[:2],'little');r=v[2]*2
                 ratio=math.sqrt(r/f) if f>r and f>0 else None
                 self.state.update(transmitting=(self.state.get('transmitting',False) or f>0 or v[3]>0),forward=f,reflected=r,input=v[3],swr=(1+ratio)/(1-ratio) if ratio is not None else None,raw=v.hex(),screen_ma=int.from_bytes(v[4:5],'little',signed=True))
@@ -57,7 +69,9 @@ class Decoder:
                     self.state['antenna_number']=int(code[0]) if code[0] in '12' and code[1:] in ('100','110') else None
                     self.state['status']=('Operate' if code[1:]=='110' else 'Standby') if code[0] in '12' and code[1:] in ('100','110') else 'Off' if code=='2000' else 'Unknown'
                     self.state.pop('countdown',None)
-                if token=='AUTO':self.state.update(autotune_phase='entered',autotune_message='Automatic tuning selected',autotune_saved=False,autotune_aborted=False,autotune_stop_reported=False,autotune_abort_origin=None,autotune_defaults=False,autotune_stopped_saved=False)
+                if token=='AUTO':
+                    self._last_plate_current=None;self._saved_tune_release=False;self._tune_save_seen=False
+                    self.state.update(autotune_phase='entered',autotune_message='Automatic tuning selected',autotune_saved=False,autotune_aborted=False,autotune_stop_reported=False,autotune_abort_origin=None,autotune_defaults=False,autotune_stopped_saved=False)
                 elif token=='AUTOESC':self.state.update(autotune_phase='cancelled',autotune_message='Automatic tuning exited',autotune_saved=False)
                 elif token.startswith('AUTO:'):
                     message=token[5:].strip()
@@ -73,7 +87,10 @@ class Decoder:
                     self.state.update(autotune_phase='unknown',autotune_message=token[:200],autotune_saved=False)
                 elif token=='SAVE DEFAULT' and self.state.get('autotune_phase')=='aborted':self.state.update(autotune_phase='defaults',autotune_message='Amplifier reported default settings saved',autotune_saved=False,autotune_defaults=True)
                 elif token=='SAVE USER' and self.state.get('autotune_phase')=='aborted' and self.state.get('autotune_abort_origin')=='stop':self.state.update(autotune_phase='stopped-exited',autotune_message='Amplifier reported user settings saved after Stop',autotune_saved=False,autotune_stopped_saved=True)
-                elif token=='SAVE USER' and self.state.get('autotune_phase')=='succeeded':self.state['autotune_saved']=True
+                elif token=='SAVE USER' and self.state.get('autotune_phase')=='succeeded':
+                    self.state['autotune_saved']=True
+                    if not self._tune_save_seen:
+                        self._saved_tune_release=True;self._tune_save_seen=True
                 elif re.fullmatch(r'(LO|TU|OT)-?\d+',token):
                     # Raw positions only; engineering-unit conversion is not yet validated.
                     prefix=token[:2];self.state[{'LO':'autotune_load_raw','TU':'autotune_tune_raw','OT':'autotune_offset_raw'}[prefix]]=int(token[2:])
@@ -81,11 +98,10 @@ class Decoder:
                 elif token=='COON':self.state['status']='Cooling down'
                 elif re.fullmatch(r'(WA|CO)\d+',token):self.state.update(status='Warming up' if token[:2]=='WA' else 'Cooling down',countdown=int(token[2:]))
                 elif token in ('PTTON','PTTOFF'):
-                    self.state['transmitting']=token=='PTTON'
-                    self.state['rf_idle_confirmed']=token=='PTTOFF'
-                    if token=='PTTOFF':
-                        self.measurement_revision+=1
-                        self.state.update(forward=0,reflected=0,swr=None,input=0,gain_db=None)
+                    if token=='PTTOFF':self.confirm_rf_idle('ptt-off-message')
+                    else:
+                        self.mark('rf');self._saved_tune_release=False;self._last_plate_current=None
+                        self.state.update(transmitting=True,rf_idle_confirmed=False,rf_idle_source=None)
                 elif re.fullmatch(r'FR\d+',token):
                     self.state['frequency_khz']=int(token[2:]);self.mark('frequency_khz')
                 else:
@@ -94,6 +110,16 @@ class Decoder:
                         key,raw=m.groups();value=float(raw)
                         fields={'IP':('plate_a',.001),'UP':('plate_v',1),'US':('screen_v',1),'UHA':('heater_a_v',1),'UHB':('heater_b_v',1),'UM':('mains_v',1),'TE':('temperature_c',.5),'UGA':('grid_a_v',1),'UGB':('grid_b_v',1)}
                         name,scale=fields[key];self.state[name]=value*scale;self.mark(name)
+                        if key=='IP' and raw.isdecimal():
+                            previous=self._last_plate_current;self._last_plate_current=value
+                            # The official remote client has this saved-tune
+                            # compatibility path when firmware omits PTTOFF.
+                            # Require the current cycle, SAVE USER, and a fresh
+                            # positive-to-zero plate-current edge; never time out RF.
+                            if self._saved_tune_release and self.state.get('autotune_phase')=='succeeded' and self.state.get('autotune_saved') and not self.state.get('autotune_aborted') and self.state.get('status')=='Operate' and self.state.get('transmitting') is True and previous is not None and previous>0 and value==0:
+                                self.confirm_rf_idle('post-tune-current-transition')
+                if self.state.get('autotune_phase') in ('cancelled','aborted','unknown','defaults','stopped-exited') or self.state.get('status') in ('Standby','Off','Cooling down','Warming up'):
+                    self._saved_tune_release=False
                 if token.startswith('AUTO'):self.mark('autotune')
                 self.state['last_status']=token
             updates.append(dict(self.state))

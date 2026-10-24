@@ -98,4 +98,20 @@ class Tests(unittest.TestCase):
   sock=PollSocket(m)
   with patch('live.socket.create_connection',return_value=sock),patch('live.time.monotonic',side_effect=lambda:clock[0]):m.run()
   self.assertGreaterEqual(sock.sent.count(b'?'),2);self.assertTrue(set(sock.sent)<={b'C',b'?',b'#',b'F'})
+ def test_fresh_general_telemetry_cannot_refresh_expired_rf_state(self):
+  m=Monitor(allow_hardware=True)
+  m.state={'connection':'Connected','status':'Operate','transmitting':True,'_received':99,'_measurement':90,'_field_times':{'rf':90,'temperature_c':99},'temperature_c':32,'forward':2474,'input':21,'autotune_phase':'succeeded','autotune_saved':True}
+  with patch('live.time.monotonic',return_value=100):
+   s=m.snapshot();self.assertEqual(s['connection'],'Connected');self.assertIsNone(s['transmitting']);self.assertTrue(s['rf_state_unknown']);self.assertEqual(s['rf_age_seconds'],10);self.assertIsNone(s['forward']);self.assertEqual(s['temperature_c'],32)
+   self.assertTrue(m.state['transmitting'],'Snapshot must not clear the internal RF guard')
+   with self.assertRaisesRegex(ValueError,'Stop transmission'):m.command('toggle','stale-rf-123',expected_mode='Operate')
+ def test_fresh_explicit_ptt_state_has_its_own_freshness(self):
+  from decoder import Decoder
+  d=Decoder();d.feed(b'PTTON;');self.assertEqual(d.field_revisions['rf'],1)
+  m=Monitor(allow_hardware=True);m.state={**d.state,'connection':'Connected','_received':99,'_measurement':80,'_field_times':{'rf':99}}
+  with patch('live.time.monotonic',return_value=100):
+   s=m.snapshot();self.assertTrue(s['transmitting']);self.assertFalse(s['rf_state_unknown']);self.assertIsNone(s['forward'])
+  d.feed(b'PTTOFF;');m.state={**d.state,'connection':'Connected','_received':99,'_measurement':80,'_field_times':{'rf':99}}
+  with patch('live.time.monotonic',return_value=100):
+   s=m.snapshot();self.assertFalse(s['transmitting']);self.assertFalse(s['rf_state_unknown']);self.assertEqual(s['forward'],0)
 if __name__=='__main__':unittest.main()
