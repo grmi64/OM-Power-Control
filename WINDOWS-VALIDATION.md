@@ -3,8 +3,8 @@
 Current review scope: simulator cleanup diagnostics, Windows WebView2 startup
 preflight/error delivery, high-DPI window bounds, and the offline acceptance
 results below. These changes are being submitted on a review branch; no public
-release or merge is authorized. Latest validation: 157 Python tests completed
-(151 passed, six expected skips) and all five JavaScript suites passed. All new
+release or merge is authorized. Latest validation: 170 Python tests completed
+(164 passed, six expected skips) and all five JavaScript suites passed. All new
 acceptance work used simulation without amplifier access. Physical multiple-
 monitor testing, redistribution-notice review and signing remain release work.
 References to local/unpublished changes in the dated sections describe their
@@ -21,7 +21,7 @@ the development toolchain; no global/system package installation was performed.
 
 ## Completed checks
 
-- Latest Python discovery: 157 tests, 151 passed, six expected skips.
+- Latest Python discovery: 170 tests, 164 passed, six expected skips.
 - Operator-driven RF-tune scope: offline tests verify one mode pair and one
   two-stage tune, socket/backend rejection of power and extra commands,
   no command-budget reset on reconnect, simulated operator RF ownership,
@@ -675,6 +675,58 @@ merged main; source/documentation changes are still uncommitted and unpublished.
 Private evidence: `.tmp/clean-pc-test/results/host-display-scaling.json` and
 `host-display-final-state.json`. Physical multiple-monitor validation remains a
 release limitation, not a successful test.
+
+## PR #3 DPI review corrections - October 24, 2026
+
+Review of 5121454 found two integration gaps that the earlier visual scaling
+checks and pure geometry tests did not detect. An isolated native probe measured
+system awareness (1), WinForms DeviceDpi 96 and actual HWND DPI 120. Resetting the
+minimum size from DeviceDpi reduced the intended 380-logical-pixel width to 304.
+The managed DpiChanged event also was not a reliable delivery path: pythonnet's
+untargeted .NET Framework domain leaves DPI-message handling disabled.
+
+The Windows package now embeds a PerMonitorV2/asInvoker manifest. Source launches
+explicitly set and verify PerMonitorV2 before creating any GUI, instance lock or
+Monitor. An already configured manifest is accepted only after verification;
+system awareness or setup failure is rejected before backend creation. Minimum
+size uses GetDpiForWindow rather than the cached WinForms property.
+
+A native common-controls window subclass receives WM_DPICHANGED directly,
+independent of the disabled managed event. It forwards normal message processing,
+then applies the suggested monitor rectangle on the UI thread, updating the
+minimum first so an old high-DPI minimum cannot block a smaller low-DPI window.
+The callback is retained for the HWND lifetime and removed on WM_NCDESTROY;
+callback failures are logged instead of escaping across the native boundary.
+No machine-wide .NET configuration or Windows display setting was changed for
+this follow-up. An attempted app-domain configuration was not effective and is
+not included in the implementation.
+
+Thirteen new offline regressions cover setup/verification, manifest declaration,
+early startup rejection, actual-HWND minimum sizing despite DeviceDpi 96,
+high-to-low minimum ordering, native notification delivery/forwarding, callback
+failure and subclass cleanup. The full suite completed 170 Python tests
+(164 passed, six expected skips), plus all five JavaScript suites.
+
+The packaged --smoke-test now checks the actual HWND's PerMonitorV2 context and
+minimum size, delivers a synthetic current-DPI WM_DPICHANGED message through
+the installed native hook, then exercises the existing simulated UI tune/save/
+RF-off flow and clean shutdown. The final host run passed at HWND DPI 120 with
+minimum 475x775 and exit code 0. Embedded resource inspection independently
+verified PerMonitorV2 and asInvoker. Synthetic message delivery is not a claim
+of physical cross-monitor movement or a real DPI transition.
+
+The final package was also checked in a fresh network-disabled Sandbox using
+an exact-checksum match: PerMonitorV2, HWND DPI 120, minimum 475x775, native
+notification delivered, simulated UI smoke passed and exit code 0. Tested ZIP
+SHA256: `a169918a90acc4dac0d6d05187cda60457fe117813eb8ae81556c312f8238cec`.
+Private evidence is under
+`.tmp/clean-pc-test/results/dpi-fix-package.json` and `dpi-fix-package.log`;
+the native source probe is `.tmp/pr3-dpi-fixed-awareness.json`. Earlier Sandbox
+results from intermediate packages are retained separately and are not counted
+as final-package evidence. Physical multiple-monitor/mixed-DPI testing remains
+pending; the missing-PTTOFF fallback remains offline-replay verified only. No
+amplifier connection, real hardware command or RF test was performed; all
+operating/tuning actions were in simulation.
 
 ## Files and commands
 

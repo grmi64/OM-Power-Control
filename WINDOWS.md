@@ -10,6 +10,8 @@ Microsoft Edge WebView2. The macOS host remains in Sources/.
 Extract the entire ZIP to a writable local folder and run `OM Power Control.exe`.
 Keep the `_internal` directory beside the executable. Python is included.
 Windows x64 and the Microsoft Edge WebView2 Evergreen Runtime are required.
+PerMonitorV2 startup requires Windows 10 version 1703 or newer APIs; validation
+has been performed on Windows 11. Other Windows builds are not yet validated.
 This is an unsigned development preview; Windows may show a publisher warning.
 
 **Every ordinary launch is OFFLINE SIMULATION.** No amplifier socket is opened,
@@ -231,6 +233,10 @@ host simulation profile after a local fix to keep windows inside the current
 monitor's work area. The original Windows scale was restored. The fix and six
 geometry regressions are included in that review. Only one physical monitor
 was available; physical multiple-monitor/mixed-DPI checks remain pending.
+PR #3's follow-up fixes verify PerMonitorV2 before GUI/backend startup, obtain
+minimum-size DPI from the actual HWND, and use native DPI notifications instead
+of the disabled WinForms event. The packaged offline smoke test checks the real
+context, minimum size and native callback before running simulated tuning.
 Multiple-monitor checks, redistribution-notice review, and Windows signing
 remain release work. Sandbox does not establish support for other Windows builds.
 Packaged Sandbox tests of unexpected tuning replies, lost telemetry and

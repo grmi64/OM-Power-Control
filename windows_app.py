@@ -5,6 +5,7 @@ import settings
 from instance_lock import InstanceLock,READER_MUTEX
 from live import Monitor,create_server
 from windows_runtime import ensure_webview2_runtime
+from windows_dpi import configure_process_dpi,window_dpi,DpiWindowHook
 
 def show_startup_error(exc):
  # A packaged windowed app can inherit redirected console handles from a
@@ -27,17 +28,20 @@ def visible_window_bounds(bounds,work_area):
  width=max(1,min(width,available_width));height=max(1,min(height,available_height))
  return (max(left,min(x,left+available_width-width)),max(top,min(y,top+available_height-height)),width,height)
 
-def keep_window_visible(window):
+def keep_window_visible(window,suggested=None):
  # Called only on the WinForms UI thread. Use one coordinate system for both
  # rectangles; CSS/pywebview logical dimensions differ at high DPI.
  from System.Drawing import Rectangle,Size
  from System.Windows.Forms import Screen,FormWindowState
  form=window.native
- if form.WindowState!=FormWindowState.Normal:return
- area=Screen.FromControl(form).WorkingArea;bounds=form.Bounds
- scale=form.DeviceDpi/96
+ area=(Screen.FromRectangle(Rectangle(*suggested)) if suggested else Screen.FromControl(form)).WorkingArea
+ # WinForms DeviceDpi can stay at 96 under pythonnet even on a scaled screen.
+ # The HWND reports the DPI actually used by pywebview's physical sizing.
+ scale=window_dpi(form.Handle.ToInt64())/96
  form.MinimumSize=Size(min(round(380*scale),area.Width),min(round(620*scale),area.Height))
- fitted=visible_window_bounds((bounds.X,bounds.Y,bounds.Width,bounds.Height),(area.X,area.Y,area.Width,area.Height))
+ if form.WindowState!=FormWindowState.Normal:return
+ bounds=form.Bounds
+ fitted=visible_window_bounds(suggested or (bounds.X,bounds.Y,bounds.Width,bounds.Height),(area.X,area.Y,area.Width,area.Height))
  if fitted!=(bounds.X,bounds.Y,bounds.Width,bounds.Height):form.Bounds=Rectangle(*fitted)
 
 class DisplayBridge:
@@ -79,6 +83,7 @@ def main(argv=None):
  if sys.platform!='win32':parser.error('The Windows desktop host requires Windows')
  if args.smoke_test and (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('Smoke tests must be offline')
  if (args.host or args.amp_port is not None) and not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('An amplifier endpoint requires an explicit hardware access mode')
+ configure_process_dpi()
  directory=settings.data_directory();directory.mkdir(parents=True,exist_ok=True)
  logging.basicConfig(filename=directory/'windows.log',level=logging.INFO)
  try:lock=InstanceLock(directory/'instance.lock',name=READER_MUTEX)
@@ -137,8 +142,11 @@ def main(argv=None):
     if str(event.Uri)!=url:event.Cancel=True
    window.native.webview.NavigationStarting+=navigating
    from System import Action
-   # Defer until WinForms has applied its suggested DPI rectangle.
-   window.native.DpiChanged+=lambda sender,event:window.native.BeginInvoke(Action(lambda:keep_window_visible(window)))
+   # pythonnet's WinForms DPI event can be disabled. Observe the native
+   # notification, then update the minimum and apply its rectangle after
+   # Windows/WinForms process the message. This callback runs on the UI thread.
+   # Keep a strong reference to the callback until the native window is destroyed.
+   window._dpi_hook=DpiWindowHook(window.native.Handle.ToInt64(),lambda suggested:keep_window_visible(window,suggested))
    keep_window_visible(window)
   window.events.before_show+=restrict_navigation
   def remember_size():
@@ -155,6 +163,34 @@ def main(argv=None):
    if not args.smoke_test:return
    try:
     if not window.events.loaded.wait(25):raise RuntimeError('WebView2 did not load')
+    # Exercise the actual HWND, not WinForms' potentially stale DeviceDpi or
+    # mocked APIs. This remains an explicitly offline smoke test.
+    import ctypes
+    from System import Action
+    from System.Windows.Forms import Screen
+    from windows_dpi import _Rect,WM_DPICHANGED
+    native_done=threading.Event();native_errors=[]
+    def native_dpi_check():
+     try:
+      form=window.native;handle=form.Handle.ToInt64()
+      api=ctypes.WinDLL('user32',use_last_error=True)
+      api.GetWindowDpiAwarenessContext.argtypes=[ctypes.c_void_p];api.GetWindowDpiAwarenessContext.restype=ctypes.c_void_p
+      api.AreDpiAwarenessContextsEqual.argtypes=[ctypes.c_void_p,ctypes.c_void_p];api.AreDpiAwarenessContextsEqual.restype=ctypes.c_int
+      if not api.AreDpiAwarenessContextsEqual(api.GetWindowDpiAwarenessContext(handle),-4):raise RuntimeError('Window is not PerMonitorV2 aware')
+      dpi=window_dpi(handle);area=Screen.FromControl(form).WorkingArea
+      expected=(min(round(380*dpi/96),area.Width),min(round(620*dpi/96),area.Height))
+      if (form.MinimumSize.Width,form.MinimumSize.Height)!=expected:raise RuntimeError('Minimum size does not use actual HWND DPI')
+      b=form.Bounds;rect=_Rect(b.X,b.Y,b.Right,b.Bottom)
+      before=window._dpi_hook.notifications
+      api.SendMessageW.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_size_t,ctypes.c_void_p];api.SendMessageW.restype=ctypes.c_ssize_t
+      api.SendMessageW(handle,WM_DPICHANGED,dpi|(dpi<<16),ctypes.byref(rect))
+      if window._dpi_hook.notifications!=before+1 or window._dpi_hook.last_error:raise RuntimeError('Native DPI notification was not handled')
+      logging.info('OFFLINE DPI CHECK PASSED: PerMonitorV2, HWND DPI %s, minimum %s, synthetic notification delivered',dpi,expected)
+     except Exception as exc:native_errors.append(exc)
+     finally:native_done.set()
+    window.native.BeginInvoke(Action(native_dpi_check))
+    if not native_done.wait(5):raise RuntimeError('Native DPI check timed out')
+    if native_errors:raise native_errors[0]
     import time
     deadline=time.monotonic()+10
     while window.evaluate_js("document.getElementById('status').textContent")!='Standby':
