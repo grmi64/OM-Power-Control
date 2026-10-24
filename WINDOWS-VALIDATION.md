@@ -425,6 +425,25 @@ signing and public distribution remain separate release work. Further operating
 commands, power-sequence tests and real auto-tune acceptance require separate
 explicit operator approval.
 
+## Mac review of PR #2 and compact simulation follow-up
+
+The Mac operator's agent reports exact commit 4b2a4c17deed90083e2044c19bf11e58bfd92154
+built successfully as a separate Apple Silicon test app. All 142 Python tests
+completed (138 passed, four expected private-capture/Windows-only skips) and all
+five JavaScript suites passed. Frozen simulation passed tuning/save, RF-active
+command blocking, RF release and return to Standby. The agent reports no hardware
+connection and unchanged production app/settings. These are operator-supplied
+Mac results, not a Mac run performed on this Windows PC.
+
+The agent found compact view hid the simulation warning and RF controls while
+leaving a LIVE badge. The shared compact CSS now exempts simulation and restricted
+mode notices from panel collapsing, retaining their ordinary hidden behavior.
+The connection badge explicitly says SIMULATION for simulated data in every
+connection state. Presentation and UI regressions pass on Windows. A local
+headless Edge attempt returned no DOM output, so rendered compact/full-view
+confirmation remains for the Mac agent's follow-up. No hardware was used for
+this UI change.
+
 ## Files and commands
 
 Run the desktop app from `dist/windows/OM Power Control/OM Power Control.exe`.

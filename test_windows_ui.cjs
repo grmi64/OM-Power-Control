@@ -9,6 +9,7 @@ vm.runInContext(script,ctx);
 (async()=>{
  await new Promise(r=>setImmediate(r));
  assert.equal(nodes.simulationPanel.hidden,false);assert.equal(nodes.shareDXC.disabled,true);
+ assert.equal(nodes.badge.textContent,'SIMULATION');assert.equal(nodes.simRFOff.disabled,false);
  assert.equal(nodes.view.textContent,'Full view');assert.equal(nodes.onTop.checked,true);
  assert.equal(native.at(-1).compact,true);listeners.pywebviewready();
  nodes.view.onclick();assert.equal(native.at(-1).compact,false);

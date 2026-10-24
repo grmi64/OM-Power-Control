@@ -33,6 +33,11 @@ for(const [connection,kind,badge] of [['Connected','live','LIVE'],['Connecting',
  const v=link({connection,settings:prefs});assert.equal(v.kind,kind);assert.equal(v.badge,badge);assert.equal(v.endpoint,'192.0.2.1:10001');
 }
 assert.equal(link({connection:'Connected',age_seconds:4}).kind,'stale');
+for(const connection of ['Connected','Stale','Disconnected']){
+ const v=link({simulated:true,connection,settings:prefs});
+ assert.equal(v.badge,'SIMULATION');assert.equal(v.kind,'simulation');
+ assert.match(v.detail,/no amplifier connection/);assert.equal(v.endpoint,'Offline simulator');
+}
 assert.match(link({connection:'Disconnected',error:'No connection acknowledgement'}).error,/acknowledge/);
 assert.match(link({connection:'Disconnected',error:'[Errno 65] No route to host'}).error,/Cannot reach/);
 assert.match(link({connection:'Disconnected',error:'No amplifier data for 10 seconds'}).error,/10 seconds/);

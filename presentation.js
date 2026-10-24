@@ -46,6 +46,7 @@ function amplifierControls(s,localPending=false){
 if(typeof module!=='undefined')module.exports.amplifierControls=amplifierControls;
 
 function amplifierConnection(s){
+ if(s.simulated)return {endpoint:'Offline simulator',kind:'simulation',badge:'SIMULATION',label:'Offline simulation',detail:'Synthetic readings only; no amplifier connection',error:''};
  const endpoint=s.settings?String(s.settings.host)+':'+String(s.settings.port):'';
  let state=s.connection||'Disconnected';
  if(state==='Connected'&&s.age_seconds>3)state='Stale';
