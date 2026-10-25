@@ -1,4 +1,4 @@
-# OM Power Control support — local draft
+# OM Power Control support
 
 Public support channel selected by the operator:
 https://github.com/grmi64/OM-Power-Control/issues
@@ -38,13 +38,12 @@ off by default, and should not be posted publicly without careful review.
 
 - Missing WebView2: follow the app's runtime message; install/repair the Microsoft
   Edge WebView2 Evergreen Runtime separately, then reopen the app.
-- Default simulated readings: expected for an ordinary launch of this candidate.
-  The next build's Connection mode panel supports explicit selection and a
-  disconnected restart (WINDOWS-STORE-LAUNCH.md). Older signed artifacts do not
-  yet contain it. Do not infer a live connection
-  from synthetic values or simulation controls.
+- Default simulated readings: expected for an ordinary launch. Disconnect,
+  choose the required Connection mode, enter its dedicated endpoint fields,
+  then Apply mode and reopen. The new process starts disconnected; click Connect
+  separately. Do not infer a live connection from synthetic values or controls.
 - Stale/unconfirmed readings: treat them as unconfirmed. Do not repeat operating
   commands blindly; the app does not automatically retry them.
 
-There is no response-time commitment in this draft. No support email address,
-private upload channel, public website change or issue submission was created.
+Support is provided through public GitHub Issues without a guaranteed response
+time. No support email or private diagnostic-upload service is offered.

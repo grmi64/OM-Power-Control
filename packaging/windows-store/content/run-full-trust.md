@@ -1,4 +1,4 @@
-# runFullTrust justification — local draft
+# runFullTrust justification — final local copy
 
 For Gregory Miller's OM Power Control Store package,
 GregoryMiller.OMPowerControl, version 1.0.31.0. Prepared for review only;
@@ -52,8 +52,7 @@ simulation instructions are provided in the reviewer notes.
 - Source: windows_app.py, windows_dpi.py, instance_lock.py, settings.py,
   live.py, session_protocol.py and dxc_feed.py.
 - Offline packaged standard-user/UI/DPI/simulation checks passed.
-- Full package-file WACK passed twice, including DPI. The optional runtime
+- Final-candidate package-file WACK passed, including DPI. The optional runtime
   finding remains visible and is assessed in WINDOWS-STORE-RUNTIME-REVIEW.md.
 - Store-user selection/self-relaunch passed offline Store-identity simulation
-  tests in an isolated build. A new signed candidate and final artifact checks
-  remain pre-release work; this does not imply Store approval.
+  tests on the final signed main 510d985 candidate; this does not imply Store approval.

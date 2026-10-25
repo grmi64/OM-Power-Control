@@ -1,0 +1,23 @@
+[
+  {
+    "url": "https://github.com/grmi64/OM-Power-Control",
+    "status_code": 200,
+    "checked_utc": "2026-10-25T17:29:23.8221354Z",
+    "authenticated": false,
+    "contains_privacy_draft": false
+  },
+  {
+    "url": "https://github.com/grmi64/OM-Power-Control/issues",
+    "status_code": 200,
+    "checked_utc": "2026-10-25T17:29:24.2804687Z",
+    "authenticated": false,
+    "contains_privacy_draft": false
+  },
+  {
+    "url": "https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md",
+    "status_code": 200,
+    "checked_utc": "2026-10-25T17:29:24.8135403Z",
+    "authenticated": false,
+    "contains_privacy_draft": true
+  }
+]

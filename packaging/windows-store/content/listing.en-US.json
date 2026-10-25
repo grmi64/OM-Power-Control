@@ -1,0 +1,50 @@
+{
+  "prepared_date": "2026-10-25",
+  "language": "en-US",
+  "product_name": "OM Power Control",
+  "publisher_display_name": "Gregory Miller",
+  "category": "Utilities & tools",
+  "price": "Free",
+  "markets": "All available Store markets",
+  "publication": "Hold for publisher approval",
+  "website": "https://github.com/grmi64/OM-Power-Control",
+  "support_url": "https://github.com/grmi64/OM-Power-Control/issues",
+  "privacy_url": "https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md",
+  "privacy_publication_gate": "Current public URL contains earlier draft; finalize by approved source merge before submission",
+  "short_description": "OM-3501A amplifier monitoring and operator-controlled tuning, with offline simulation.",
+  "description": "OM Power Control is an independent, open-source desktop app for the OM Power\nOM-3501A amateur-radio amplifier. View forward and reflected power, calculated\nSWR, frequency, temperature and additional amplifier readings in a full dashboard\nor compact window. Choose the secondary meter and keep the display on top.\n\nThe app supports amplifier Operate/Standby, normal cooling and warm-up sequences,\nand automatic tuning with amplifier-confirmed results. You supply and stop tuning\nRF and set the radio's drive power. The app never keys the radio or adjusts its\ndrive power. Use the amplifier within the manufacturer's requirements and your\nstation's limits.\n\nThe app opens in clearly labeled offline simulation, so you can explore\nthe interface and simulated tuning without connecting equipment. Real amplifier\naccess requires an explicit choice in Connection mode and a configured amplifier\naddress. Disconnect, choose read-only telemetry or amplifier controls, confirm\nApply mode and reopen, then click Connect separately when authorized. A normal\nStart-menu launch remains simulation.\n\nOptional integration with DX Caliber can share readings and selected controls\nlocally on the same PC. It is off by default; DX Caliber is not required for\nstandalone use.\n\nRequires Windows 11 x64 and the Microsoft Edge WebView2 Evergreen Runtime.\nPython is bundled. Real equipment validation covers the OM-3501A; other model\nlabels provide monitoring only and do not establish compatibility. This is an\nindependent project, not an official OM Power product or manufacturer endorsement.",
+  "features": [
+    "Forward/reflected power, calculated SWR, frequency and temperature.",
+    "Additional measurements and a selectable secondary meter.",
+    "Full and compact displays with saved stay-on-top preference.",
+    "Clearly labeled offline simulation, including successful and interrupted tunes.",
+    "Operator-controlled amplifier modes and automatic tuning in hardware mode.",
+    "Optional local DX Caliber integration; disabled by default."
+  ],
+  "release_notes": "First Windows release of OM Power Control, using the shared Python backend and\nHTML/JavaScript interface with a native WebView2 desktop host. Includes offline\nsimulation, compact/stay-on-top preferences, automatic-tuning state handling,\nreconnect improvements, RF-state guards and native DPI support. OM-3501A hardware\ntesting and offline Store-package checks are documented in the project.",
+  "age_rating": "Complete Partner Center questionnaire; no rating assigned here",
+  "submitted": false,
+  "published": false,
+  "screenshots": [
+    {
+      "file": "screenshots/01-simulation-dashboard.png",
+      "caption": "Full dashboard in offline simulation. Synthetic readings; no amplifier connected."
+    },
+    {
+      "file": "screenshots/02-compact-simulation.png",
+      "caption": "Compact dashboard layout in offline simulation, with the simulation warning and controls visible."
+    },
+    {
+      "file": "screenshots/03-simulated-tune-saved.png",
+      "caption": "A successful simulated tune reports saved settings. Simulated RF remains on until stopped by the operator."
+    },
+    {
+      "file": "screenshots/04-simulated-rf-off.png",
+      "caption": "After simulated RF is stopped, power readings return to zero and the saved tune remains visible."
+    },
+    {
+      "file": "screenshots/05-simulated-tune-readiness.png",
+      "caption": "Simulated auto-tune waits for simulated input power. No real amplifier, radio or RF source is involved."
+    }
+  ]
+}
