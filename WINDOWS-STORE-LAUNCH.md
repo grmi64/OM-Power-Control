@@ -112,3 +112,25 @@ packaged handoff test remains evidence for that earlier isolated review build;
 new signed-candidate/package acceptance is still required. Existing release
 EXE/ZIP/MSIX hashes are unchanged. No amplifier connection, commit, push, merge,
 submission or publication occurred.
+
+## PR #5 rendering fix — 2026-10-24
+
+Added an explicit #accessEndpoint[hidden] display:none rule. The shared .fields
+display:grid style previously overrode the hidden attribute, leaving address/port
+controls visible in simulation despite the JavaScript property being true.
+
+scripts/test-windows-access-rendering.py uses real WebView2 with the production
+shared styles and Windows access panel/script, but no main UI/backend, fetches or
+hardware reader. It checks computed display and bounding boxes, not just hidden.
+Eight cases cover simulation -> read-only -> hardware -> simulation in full and
+compact viewports; selecting these presentation options does not launch a mode
+or create a connection. Simulation has display:none and zero dimensions; both
+endpoint inputs render in the other two choices.
+
+The test failed against the old CSS and passed after the fix. It is now part of
+scripts/test-windows.ps1 and requires an interactive Windows environment with
+WebView2 available. Final suite: 199 Python tests, 193 passed/six expected skips,
+all six JavaScript suites, and all eight real rendering cases passed. Private
+evidence is in .tmp/pr5-hidden-fields/tests.log and the rendering report path
+printed there. Existing release binaries were not rebuilt. No amplifier connection,
+Store submission, merge or release publication occurred.

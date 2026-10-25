@@ -1121,3 +1121,16 @@ suites passed. No native hardware session or amplifier connection was opened.
 These source fixes were not rebuilt into release artifacts in this step; EXE,
 ZIP and production Store MSIX hashes remain unchanged. No commit, push, merge,
 submission or publication occurred. See WINDOWS-STORE-LAUNCH.md for artifact scope.
+
+## PR #5 endpoint rendering regression — 2026-10-24
+
+Fixed the shared grid style overriding the access endpoint's hidden attribute.
+The new real-WebView2 rendering check failed before the fix and passed afterward,
+checking computed display and field geometry across eight full/compact mode-choice
+states. It uses only local production UI styles/panel/script, with no backend,
+network fetches or amplifier reader. Mode choices in this check are presentation
+only. The Windows test runner now includes it and requires WebView2/desktop access.
+
+Validation: 199 Python tests (193 passed, six expected skips), all six JavaScript
+suites and all eight rendering cases passed. No release EXE/ZIP/MSIX rebuild,
+amplifier connection, Store submission, merge or release publication occurred.

@@ -6,3 +6,5 @@ foreach ($test in @('test_presentation.cjs','test_ui_actions.cjs','test_autotune
     & node $test
     if ($LASTEXITCODE -ne 0) { throw "UI test failed: $test" }
 }
+& .\.venv\Scripts\python.exe (Join-Path $PSScriptRoot 'test-windows-access-rendering.py')
+if ($LASTEXITCODE -ne 0) { throw 'Windows access-mode WebView2 rendering check failed.' }
