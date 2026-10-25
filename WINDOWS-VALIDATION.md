@@ -742,3 +742,129 @@ The initial Windows port and shared reconnect changes were merged in PR #1.
 The shared RF-off changes and operator-driven tune-test policy were merged in
 PR #2. The existing Mac release has not been updated. Local binaries,
 station settings and private diagnostic traces are excluded from Git.
+# Final Windows candidate acceptance — 2026-10-24
+
+Application code: merged main `f5451a35b1104cc70ced414e3d294a4e0a5f16aa`.
+The candidate adds local release documentation only; the EXE is the rebuilt main
+binary. ZIP SHA-256:
+`ee2b9c599f05e3488872b34e05aca804d42a4d5f4dd3323b6517310445bd3d1a`.
+This record was added after testing and is not inside that exact ZIP.
+
+A fresh Windows Sandbox (build 26300 host) used networking disabled, zero guest
+network adapters, read-only package input and a separate writable results folder.
+The entire ZIP was extracted, with its checksum verified. No Python installation
+or amplifier connection was used by the packaged tests.
+
+- Packaged UI smoke passed with exit code 0: actual PerMonitorV2 HWND at DPI 120,
+  minimum 475 x 775, synthetic native DPI callback, full/compact and stay-on-top
+  controls, simulated tune/save, operator-controlled simulated RF release,
+  dismissal and disconnect.
+- Ordinary EXE launch with no arguments connected only to the simulator. A local
+  loopback API check saved the input-drive secondary-meter preference, performed
+  simulated tune/save and RF release, and returned to simulated Standby.
+- Close exited with code 0. Reopening without arguments restored the saved meter
+  preference and remained simulated Standby with RF off; final close exited 0.
+- The ZIP includes Windows instructions, release notes and dependency notices.
+  No runtime settings, instance lock or private telemetry logs were found in it.
+
+Private evidence: `.tmp/clean-pc-test/results/final-main-smoke.json`,
+`final-main-smoke.log`, and `final-main-preferences.json`. An early preference
+attempt ran before extraction and failed setup. The configured logon smoke and
+a manual retry then overlapped, causing the first run to be closed by the helper;
+that interrupted run is not a pass. The final sequential smoke above had no
+prior-process cleanup, passed independently and exited cleanly.
+
+The operator requires trusted code signing before publication. The candidate is
+currently NotSigned; no current-user code-signing certificate was found. Signing
+identity provisioning and actual signing remain outstanding. Use SHA-256 and an
+RFC 3161 timestamp, verify the intended publisher and trust chain on a clean
+system, repackage/checksum, and repeat acceptance on the signed artifact.
+See [Microsoft SignTool](https://learn.microsoft.com/en-us/windows/win32/seccrypto/signtool)
+and [SmartScreen reputation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+Signing alone does not guarantee absence of reputation warnings.
+
+Physical multiple-monitor testing is deferred at the operator's request. The
+existing redistribution-notice review remains pending, including the documented
+proxy_tools metadata discrepancy and WebView2 SDK terms. No public release,
+upload, purchase, or hardware test occurred. The missing-PTTOFF fallback remains
+offline-replay verified only. These results do not expand Windows-version support.
+
+## Azure-signed Windows candidate — 2026-10-24
+
+Azure Artifact Signing Basic account `ny6comsigning`, region West US 2,
+Public Trust profile `ompowerrelease`, signed the rebuilt main EXE as Gregory
+Miller. SignTool signing and `/pa /all /v /tw` verification each completed with
+zero errors and warnings. Windows Authenticode status was Valid. A Microsoft
+RFC 3161 timestamp was verified. The certificate's short validity is expected;
+the timestamp is required for validation after certificate expiration.
+
+Signed ZIP SHA-256:
+`b1f1f451ad85ce63047d267a4be44097c8bee1ff841cfb58030a7833b9585c48`.
+Signed EXE SHA-256:
+`57e0372248fd6ea736b0530d3233842f3e2d5ca3b60886bf5eaa1869c0817587`.
+The ZIP's EXE exactly matches the signed local EXE. No private runtime settings,
+instance lock or telemetry logs were found in the ZIP. The candidate includes
+local release documentation over application code from merged main f5451a3.
+
+A fresh Sandbox with networking disabled and zero guest network adapters verified
+this package's checksum and passed the packaged DPI/UI/simulated auto-tune smoke
+with exit code 0. Authenticode also reported Valid inside that fresh offline guest,
+with publisher Gregory Miller and a timestamp present. An ordinary launch without
+arguments used simulation; simulated tune/save, RF release, Standby, saving a meter
+preference and reopening with that preference restored passed. Both launches
+exited 0. No amplifier connection occurred.
+
+An initial reopen helper tried closing after backend readiness without explicitly
+waiting for the desktop window; its final close check failed. The still-running
+window was later responsive and accepted a normal close. The repeat helper waited
+for a nonzero desktop window handle and SIMULATION title before returning from
+startup; both clean exits then passed. No application code was changed for this
+helper timing correction. The interrupted attempt is not recorded as a pass.
+
+Private evidence: `.tmp/signing/package-verification.json`,
+`.tmp/clean-pc-test/results/signed-main-smoke.json`, `signed-main-smoke.log`,
+and `signed-main-preferences.json`. This result was added after packaging and is
+not inside that exact ZIP. See WINDOWS-SIGNING.md for the local signing workflow.
+No release, tag, upload, or amplifier command was performed. Signing is complete
+for this candidate; redistribution-notice review remains outstanding, physical
+multiple-monitor testing remains deferred, and missing-PTTOFF recovery remains
+verified only by offline replay. Download reputation has not been tested.
+
+## Dependency-notice gate resolved — 2026-10-24
+
+See WINDOWS-DEPENDENCY-AUDIT.md and ThirdPartyNotices/windows/README.txt for the
+pinned Windows candidate audit. The proxy_tools BSD/MIT metadata discrepancy is
+recorded with both upstream notices preserved; exact WebView2 SDK license and
+NOTICE texts, Windows Python/native-runtime notices, packaging/vendor notices,
+and MPL-covered corresponding validation source are included. Five WebView2 DLLs
+were matched byte-for-byte to the exact 1.0.3856.49 NuGet package. No application
+code or third-party executable binary changed.
+
+The offline packaging check passed all 55 required notice/source hashes, frozen
+module-root coverage, dependency-version checks and 78 binary fingerprints. Five
+new omission/drift regressions passed. The complete offline suite ran 175 Python
+tests: 169 passed, six expected skips; all five JavaScript suites passed.
+
+The ZIP was repackaged with these notices. SHA-256:
+4b711e4950ae0d787d3055523d4c5bcde0ca7fc8bd114bb9cc418834a2359819.
+The signed EXE retains SHA-256
+57e0372248fd6ea736b0530d3233842f3e2d5ca3b60886bf5eaa1869c0817587;
+SignTool verification passed with its RFC 3161 timestamp. Archive contents match
+the notice/binary inventory and signed EXE, with no private runtime files found.
+The network-disabled Sandbox verified this ZIP's checksum and passed the actual
+DPI/UI/simulated auto-tune/save/RF-release smoke, exiting 0. The dependency-notice
+gate is resolved for this exact bundle; monitor tests remain deferred and download
+reputation remains untested. No amplifier connection or publication occurred.
+The audit report and this result were added after the exact tested ZIP was made.
+
+## Review-branch verification — 2026-10-24
+
+Before committing the release documentation/notices, the packaging checker was
+updated to accept Git's LF/CRLF text conversion while keeping all DLL/PYD/JAR
+fingerprints byte-exact. A sixth regression covers both checkout directions.
+The complete offline suite then passed: 176 Python tests, 170 passed and six
+expected skips, plus all five JavaScript suites. The current signed package's
+55 notice/source files and frozen module/binary inventory also passed audit.
+The signed binary and previously recorded ZIP test evidence are unchanged;
+updated source documentation is committed separately for review, not published
+as a release. No amplifier connection or operating commands occurred.
