@@ -67,7 +67,9 @@ class Decoder:
                     code,name=status_match.groups()
                     self.state['antenna_name']=name.strip()[:80]
                     self.state['antenna_number']=int(code[0]) if code[0] in '12' and code[1:] in ('100','110') else None
-                    self.state['status']=('Operate' if code[1:]=='110' else 'Standby') if code[0] in '12' and code[1:] in ('100','110') else 'Off' if code=='2000' else 'Unknown'
+                    # ST1000 was observed with the TCP interface alive and the
+                    # operator confirming the PA was off (firmware 3.21).
+                    self.state['status']=('Operate' if code[1:]=='110' else 'Standby') if code[0] in '12' and code[1:] in ('100','110') else 'Off' if code in ('1000','2000') else 'Unknown'
                     self.state.pop('countdown',None)
                 if token=='AUTO':
                     self._last_plate_current=None;self._saved_tune_release=False;self._tune_save_seen=False
