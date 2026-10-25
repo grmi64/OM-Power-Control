@@ -1,5 +1,9 @@
 OM Power Control runtime notices
 
+This overview describes the upstream macOS bundle. For the Windows inventory
+and redistribution notices, see windows/README.txt and windows/inventory.json.
+Windows packaging includes some setuptools/PyInstaller helper modules.
+
 Python 3.12.14 (Astral python-build-standalone 20260901, aarch64 Apple Darwin pgo+lto).
 Upstream distribution: https://github.com/astral-sh/python-build-standalone/releases/tag/20260901
 The included upstream license collection covers Python and its statically incorporated dependencies. System-provided macOS frameworks and libraries are not redistributed.

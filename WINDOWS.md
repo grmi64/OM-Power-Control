@@ -1,4 +1,4 @@
-# OM Power Control for Windows — development preview
+# OM Power Control for Windows â€” development preview
 
 Port baseline: public v0.1.31 source, commit df916b9. This preview reuses the
 original HTML/JavaScript interface, decoder, single socket worker and automatic
@@ -12,7 +12,11 @@ Keep the `_internal` directory beside the executable. Python is included.
 Windows x64 and the Microsoft Edge WebView2 Evergreen Runtime are required.
 PerMonitorV2 startup requires Windows 10 version 1703 or newer APIs; validation
 has been performed on Windows 11. Other Windows builds are not yet validated.
-This is an unsigned development preview; Windows may show a publisher warning.
+Source builds are unsigned unless separately signed after building. The local
+release candidate has been signed with Azure Artifact Signing as Gregory Miller.
+Trusted publisher signing is required before public release. Windows reputation
+warnings can still appear for new downloads. See WINDOWS-RELEASE-NOTES.md for
+publication gates; do not bypass protection warnings during acceptance tests.
 
 **Every ordinary launch is OFFLINE SIMULATION.** No amplifier socket is opened,
 saved hardware auto-connect is ignored, and DX Caliber sharing is disabled in
@@ -237,8 +241,11 @@ PR #3's follow-up fixes verify PerMonitorV2 before GUI/backend startup, obtain
 minimum-size DPI from the actual HWND, and use native DPI notifications instead
 of the disabled WinForms event. The packaged offline smoke test checks the real
 context, minimum size and native callback before running simulated tuning.
-Multiple-monitor checks, redistribution-notice review, and Windows signing
-remain release work. Sandbox does not establish support for other Windows builds.
+PR #3 is merged into main. Dependency-notice review for the pinned Windows
+bundle is complete; see ThirdPartyNotices/windows/README.txt and inventory.json.
+Physical multiple-monitor checks remain deferred; trusted signing is required
+before publication, and the local candidate EXE is signed.
+Sandbox does not establish support for other Windows builds.
 Packaged Sandbox tests of unexpected tuning replies, lost telemetry and
 disconnection also passed, including guarded controls and no false success or
 retries. A local simulator-only cleanup fix preserves the original error reason;
