@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-25",
+  "candidate_commit": "510d98538a11c86d6c630508d84b6b0a91f12d16",
+  "candidate_exe_sha256": "cc611770e4ceb58e6b417e527f6ce078caa40a2ad0b7c6ee74883fa70a41a9cf",
+  "capture_tool": "Computer Use skill / @oai/sky",
+  "blank_station_identity": true,
+  "isolated_local_profile": true,
+  "hardware_connection": false,
+  "note": "Actual app captures supplied as JPEG by capture tool and converted to PNG without resizing, compositing or overlays. Compact-layout captures show the actual compact layout maximized to the desktop. All readings are simulated.",
+  "screenshots": [
+    {
+      "file": "01-simulation-dashboard.png",
+      "width": 1536,
+      "height": 960,
+      "bytes": 286325,
+      "sha256": "4b18575738be9ba3c6234d307435f788309effd4a2af8e6dbf397bae7ec123de",
+      "caption": "Full dashboard in offline simulation. Synthetic readings; no amplifier connected.",
+      "simulation": true
+    },
+    {
+      "file": "02-compact-simulation.png",
+      "width": 1536,
+      "height": 960,
+      "bytes": 319142,
+      "sha256": "00bef3f8577296ea120c509b8c652790dac67d9b7335ee779ee54fad4a7c035e",
+      "caption": "Compact dashboard layout in offline simulation, with the simulation warning and controls visible.",
+      "simulation": true
+    },
+    {
+      "file": "03-simulated-tune-saved.png",
+      "width": 1536,
+      "height": 960,
+      "bytes": 333993,
+      "sha256": "707e77840118c5dd331c2d6e4a74e60314d54609bc8817ac0ce67cc53b4dfe16",
+      "caption": "A successful simulated tune reports saved settings. Simulated RF remains on until stopped by the operator.",
+      "simulation": true
+    },
+    {
+      "file": "04-simulated-rf-off.png",
+      "width": 1536,
+      "height": 960,
+      "bytes": 323707,
+      "sha256": "bfa470162a93859e2308122d7bf7fb96bc0b6b6cc98a3df537ad4fc9c46e9d77",
+      "caption": "After simulated RF is stopped, power readings return to zero and the saved tune remains visible.",
+      "simulation": true
+    },
+    {
+      "file": "05-simulated-tune-readiness.png",
+      "width": 1536,
+      "height": 960,
+      "bytes": 342248,
+      "sha256": "1439a421f4539a3eb8a7c3dd127abbbd297161e118608ee57c333b82f0f5bb15",
+      "caption": "Simulated auto-tune waits for simulated input power. No real amplifier, radio or RF source is involved.",
+      "simulation": true
+    }
+  ]
+}

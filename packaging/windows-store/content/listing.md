@@ -1,27 +1,29 @@
-# Store listing — local draft
+# Store listing — final local copy
 
-Status: review text only. No fields have been entered or submitted to Partner
-Center. Review field names, available categories and limits there before use;
-this offline preparation does not assume the current portal schema.
+Prepared 2026-10-25 for publisher review and entry into Partner Center. Nothing
+has been uploaded, submitted or published. Pricing/markets below were selected
+by the publisher; publication timing and the portal questionnaires remain pending.
 
 ## Product metadata
 
-| Item | Draft value / decision |
+| Item | Final local value |
 |---|---|
 | Reserved product name | OM Power Control |
 | Publisher display name | Gregory Miller |
 | Language | English (United States) |
-| Suggested category | Utilities & tools; confirm available choice in portal |
+| Category | Utilities & tools (use the matching portal category) |
 | Package | Windows 11 x64; package 1.0.31.0, application 0.1.31 |
-| Pricing, markets, availability | Not selected; operator decision before submission |
+| Pricing | Free; no in-app purchases or advertisements |
+| Markets | All available Store markets, as selected by the publisher |
+| Publication timing | Hold until the publisher approves submission/publication |
 | Website | https://github.com/grmi64/OM-Power-Control |
 | Support | https://github.com/grmi64/OM-Power-Control/issues — operator-selected channel |
-| Proposed privacy URL | https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md — not live from this local draft |
+| Privacy URL | https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md — verify finalized contents after merge |
 | License | MIT project source; bundled components retain their own licenses/notices |
 
-Public URLs have not been rechecked online during this offline task. The privacy
-file must be approved, separately published and checked at its public URL before
-that field is used. This draft does not authorize publication.
+The repository is public. See links.json for anonymous link checks and the
+publication gate: the current public privacy file is the earlier draft. Merge
+the finalized policy and verify its public contents before Store submission.
 
 ## Short description
 
@@ -40,7 +42,7 @@ RF and set the radio's drive power. The app never keys the radio or adjusts its
 drive power. Use the amplifier within the manufacturer's requirements and your
 station's limits.
 
-This candidate opens in clearly labeled offline simulation, so you can explore
+The app opens in clearly labeled offline simulation, so you can explore
 the interface and simulated tuning without connecting equipment. Real amplifier
 access requires an explicit choice in Connection mode and a configured amplifier
 address. Disconnect, choose read-only telemetry or amplifier controls, confirm
@@ -56,12 +58,6 @@ Python is bundled. Real equipment validation covers the OM-3501A; other model
 labels provide monitoring only and do not establish compatibility. This is an
 independent project, not an official OM Power product or manufacturer endorsement.
 
-**Pre-release dependency:** the new in-app workflow passed isolated Store-identity
-simulation tests (WINDOWS-STORE-LAUNCH.md), but older signed release artifacts
-have not been rebuilt with it. Rebuild/sign and validate the exact new candidate
-before using these instructions in a public listing. No amplifier connection
-was made to test the new workflow.
-
 ## Feature bullets
 
 - Forward/reflected power, calculated SWR, frequency and temperature.
@@ -76,24 +72,27 @@ was made to test the new workflow.
 OM Power Control; OM-3501A; amateur radio; ham radio; amplifier monitoring;
 Ethernet amplifier; automatic tuning. Adapt to the portal's actual keyword fields.
 
-## Release notes draft
+## Release notes
 
-First Windows preview of OM Power Control, using the shared Python backend and
+First Windows release of OM Power Control, using the shared Python backend and
 HTML/JavaScript interface with a native WebView2 desktop host. Includes offline
 simulation, compact/stay-on-top preferences, automatic-tuning state handling,
 reconnect improvements, RF-state guards and native DPI support. OM-3501A hardware
 testing and offline Store-package checks are documented in the project.
 
-## Required assets and final choices
+## Screenshots and remaining portal entries
 
-- Prepare actual screenshots from this candidate: full simulated dashboard,
-  compact simulated dashboard, simulated tune readiness and successful save.
-  Keep SIMULATION visible; do not imply screenshots are live RF readings.
-- Use blank/sample station identity; omit IP addresses, private logs and tokens.
-- Existing package icons are available. Store promotional artwork and screenshot
-  dimensions/field requirements still need confirmation in the portal.
-- Complete the age/content questionnaire accurately; no age rating is assigned
-  by this document. Pricing, countries/regions and publication timing are open.
-- Physical multiple-monitor/mixed-DPI tests remain deferred. S mode, Windows 10,
-  ARM64 and other amplifier models are not claimed as validated configurations.
-- No screenshots, ratings, remote listings or publication settings were changed.
+Use the reviewed PNGs and captions in screenshots/. Every capture comes from
+the signed Windows candidate in offline simulation with blank station settings.
+Do not describe synthetic readings as live RF. No hardware is connected.
+
+Complete the portal content/age questionnaire accurately; this document assigns
+no rating. Select Free and all available markets. Do not enable automatic
+publication until the publisher approves it. Promotional art and trailers are
+optional and are not included in this delivery.
+
+Physical multiple-monitor/mixed-DPI tests remain deferred. S mode, Windows 10,
+ARM64 and other amplifier models are not claimed as validated configurations.
+The exact release candidate is main 510d985, Store package 1.0.31.0; required
+WACK tests passed and the optional bundled-runtime finding remains disclosed in
+reviewer-notes.md. The final Windows RF-output and auto-tune tests passed.

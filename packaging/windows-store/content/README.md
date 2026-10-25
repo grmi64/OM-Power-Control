@@ -1,49 +1,60 @@
-# Local Store content preparation — 2026-10-24
+# Store submission content — final local preparation, 2026-10-25
 
-All files here are drafts for operator review. No portal fields, remote files,
-Store submission, public privacy policy or publication settings were changed.
-This preparation used source/local test evidence only, with no amplifier access
-or Internet requests.
+The listing, support text, restricted-capability explanation and privacy policy
+are ready for publisher review. No Partner Center fields, submission or remote
+publication settings were changed. App screenshot work uses offline simulation
+only; no amplifier connection or RF is involved.
 
-| Deliverable | Local file | Status |
-|---|---|---|
-| Restricted capability explanation | [run-full-trust.md](run-full-trust.md) | Prepared; matches packagedClassicApp/mediumIL/runFullTrust architecture |
-| Listing text and metadata | [listing.md](listing.md) | Prepared; open choices and hardware-launch dependency labeled |
-| Offline certification instructions | [reviewer-notes.md](reviewer-notes.md) | Prepared; normal launch is simulation, no equipment/credentials required |
-| Public support text | [support.md](support.md) | Prepared; GitHub Issues explicitly chosen by operator |
-| Privacy policy | [PRIVACY.md](../../../PRIVACY.md) | Prepared as a local draft, not an effective published policy |
+## Submission files
 
-## Decisions and work still needed
+- listing.md: listing text, feature bullets, release notes and publisher choices.
+- listing.en-US.json: copy-ready field values and selected pricing/markets.
+- screenshots/: authentic candidate captures, captions and integrity manifest.
+- reviewer-notes.md: certification instructions requiring no equipment or account.
+- run-full-trust.md: restricted-capability justification for the desktop host.
+- support.md: public GitHub Issues channel and reporting instructions.
+- ../../../PRIVACY.md: finalized local policy; the public main URL still contains
+  the earlier draft until a separately authorized commit/review/merge.
+- links.json: anonymous HTTP status checks of the selected public URLs.
 
-1. Approve the draft wording and privacy effective date. The proposed future URL
-   is https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md.
-   That file is local only; do not enter the URL as a live policy until separate
-   publication is authorized and its unauthenticated availability is checked.
-2. Review the Connection mode workflow in WINDOWS-STORE-LAUNCH.md. Isolated
-   Store-identity simulation tests passed; rebuild/sign and validate a new release
-   candidate containing it. Normal launches remain simulation and every mode
-   handoff starts disconnected. No amplifier connection was tested.
-3. Choose pricing, markets and availability. Complete the portal's content/age
-   questionnaire; this offline draft assigns no rating or price.
-4. Capture and review real simulation screenshots and any required listing art;
-   confirm the portal's current fields, character limits and asset dimensions.
-5. Recheck the selected repository/support URLs online when authorized. No account
-   email, home address or Azure account identifiers were used as public contacts.
-6. Complete final release review. Physical monitor tests remain deferred and
-   actual Store certification/delivery remain untested. S mode is not claimed.
+## Publisher decisions
 
-## Source review behind the drafts
+Free in all available Store markets; English (United States); Windows 11 x64;
+Utilities & tools. Support: https://github.com/grmi64/OM-Power-Control/issues.
+Website: https://github.com/grmi64/OM-Power-Control.
+Privacy: https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md.
+No personal account email, address or Azure identity is used as a public contact.
 
-windows_app.py and windows_runtime.py establish simulation defaults, explicit
-hardware modes, WebView2 hosting/navigation restrictions, runtime requirements
-and per-user diagnostics. settings.py establishes station fields and local files.
-live.py, session_protocol.py and dxc_feed.py establish local HTTP, amplifier TCP,
-optional local sharing/control and mode restrictions. wire_trace.py establishes
-raw local diagnostics and per-file bounds. live.html uses local assets/fetches
-and browser preference storage. README.md documents independent project status,
-OM-3501A scope, RF/drive responsibility, existing support URL and licensing.
+## Candidate evidence
 
-The local WACK/UI/runtime reviews are in WINDOWS-STORE-CERTIFICATION.md and
-WINDOWS-STORE-RUNTIME-REVIEW.md. Draft text does not expand those test claims.
-These content files are not automatically added to the existing MSIX by this task;
-the signed EXE, ZIP and unsigned Store candidate remain unchanged.
+Main 510d985; app 0.1.31; Store package 1.0.31.0. Signed portable EXE/ZIP and
+Store-identity MSIX passed offline regression, Sandbox UI/DPI/simulated tuning,
+self-relaunch, preferences, reinstall/uninstall and complete package-file WACK.
+All required WACK tests passed; the optional bundled-runtime finding is unchanged.
+Final Windows RF-output and auto-tune acceptance passed separately with operator
+RF/drive control, explicit PTTOFF, return to Standby and clean session release.
+The missing-PTTOFF fallback retains offline replay verification only.
+
+The exact artifact hashes and acceptance record are local at
+`dist/msix/main-510d985/validation.json`. Content edits do not rebuild, re-sign or
+change those binaries. Physical multiple-monitor tests remain deferred; S mode,
+Windows 10, ARM64 and other amplifier models are not claimed as validated.
+
+## Final publication gates
+
+1. Review and authorize committing/pushing/merging these content files. Recheck
+   the public privacy URL afterward: HTTP 200 alone is insufficient while it
+   still displays the earlier draft. The finalized policy must be public before
+   Store submission.
+2. Complete the Partner Center content/age questionnaire accurately. No age
+   rating is assigned here. Confirm the matching category and all-market/free
+   settings in the actual portal. Do not choose automatic publication without
+   publisher approval.
+3. Upload only the exact tested MSIX and reviewed screenshots when authorized.
+   Upload, submission and publication have not been authorized by this task.
+
+Microsoft screenshot guidance checked 2026-10-25:
+https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images
+Desktop PNGs must be at least 1366 x 768 (portrait also permitted), under 50 MB.
+Captions are at most 200 characters. Keep simulation labeling visible and do
+not add logos or marketing overlays to the captures.

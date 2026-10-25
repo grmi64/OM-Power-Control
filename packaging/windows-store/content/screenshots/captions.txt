@@ -1,0 +1,14 @@
+01-simulation-dashboard.png
+Full dashboard in offline simulation. Synthetic readings; no amplifier connected.
+
+02-compact-simulation.png
+Compact dashboard layout in offline simulation, with the simulation warning and controls visible.
+
+03-simulated-tune-saved.png
+A successful simulated tune reports saved settings. Simulated RF remains on until stopped by the operator.
+
+04-simulated-rf-off.png
+After simulated RF is stopped, power readings return to zero and the saved tune remains visible.
+
+05-simulated-tune-readiness.png
+Simulated auto-tune waits for simulated input power. No real amplifier, radio or RF source is involved.

@@ -1,8 +1,9 @@
-# OM Power Control for Windows — privacy policy draft
+# OM Power Control for Windows — privacy policy
 
-**Local review draft, prepared 2026-10-24. Not yet approved or published as the
-effective Store privacy policy.** This describes the reviewed Windows 0.1.31
-candidate (Store package 1.0.31.0), whose publisher is Gregory Miller.
+Last updated: October 25, 2026.
+
+This policy describes OM Power Control for Windows 0.1.31 (Store package
+1.0.31.0), published by Gregory Miller.
 
 ## Information used by the application
 
@@ -81,7 +82,7 @@ the app cannot erase other people's copies.
 
 ## Scope and changes
 
-This draft describes OM Power Control's reviewed Windows candidate, not the
+This policy describes OM Power Control for Windows, not the
 manufacturer's hardware, DX Caliber, GitHub or Microsoft's independent services.
-The policy must be reviewed when data handling changes. An effective date and
-the final public URL will be set only after the publisher approves publication.
+This policy will be updated when the application's data handling changes. The
+current policy is maintained at https://github.com/grmi64/OM-Power-Control/blob/main/PRIVACY.md.
