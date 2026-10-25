@@ -23,6 +23,13 @@ saved hardware auto-connect is ignored, and DX Caliber sharing is disabled in
 simulation. The amber simulation panel and window title identify synthetic data.
 Simulation settings use a separate file from real station settings.
 
+The next source/review build adds a Connection mode panel: disconnect, choose
+simulation/read-only/hardware controls, enter an endpoint for hardware, and
+select Apply mode and reopen. Amplifier modes require confirmation. The app
+reopens disconnected and waits for a separate Connect click, even with saved
+auto-connect enabled. Normal Start-menu launches remain simulation. See
+WINDOWS-STORE-LAUNCH.md; older signed local artifacts do not yet include this change.
+
 1. Start in simulated Standby. Choose Go to Operate.
 2. Choose Auto-tune and confirm. Wait for WAITING FOR INPUT POWER.
 3. Click Simulated RF on. A successful simulated tune completes in four seconds.

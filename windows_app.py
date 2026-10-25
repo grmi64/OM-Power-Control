@@ -6,6 +6,7 @@ from instance_lock import InstanceLock,READER_MUTEX
 from live import Monitor,create_server
 from windows_runtime import ensure_webview2_runtime
 from windows_dpi import configure_process_dpi,window_dpi,DpiWindowHook
+from windows_access import prepare_launch,launch_replacement
 
 def show_startup_error(exc):
  # A packaged windowed app can inherit redirected console handles from a
@@ -52,6 +53,15 @@ class DisplayBridge:
   dispatch=getattr(self,'_dispatch',None)
   if dispatch:dispatch(dict(options))
   else:self._apply(options)
+ def request_access_mode(self,value):
+  if not getattr(self,'_access_allowed',False):raise ValueError('Mode changes are unavailable in this restricted test session')
+  if getattr(self,'_access_args',None) is not None:raise ValueError('A mode change is already in progress')
+  args=prepare_launch(value,self._monitor.snapshot())
+  if getattr(self,'_access_smoke_only',False):
+   if value['mode']!='simulation':raise ValueError('Offline access smoke permits simulation only')
+   args.append('--smoke-test')
+  self._access_args=args
+  return {'reopening':True}
  def _apply(self,options):
   with self._lock:
    small=options['compact'];window=self._window
@@ -67,7 +77,7 @@ class DisplayBridge:
    if changed:window.resize(*size)
    window.set_title('OM Power Control · '+('OPERATOR RF TUNE TEST' if getattr(self,'_tune_test',False) else 'NO-RF READINESS TEST' if getattr(self,'_readiness_test',False) else 'POWER-CYCLE TEST' if getattr(self,'_power_test',False) else 'OPERATE / STANDBY TEST' if getattr(self,'_mode_test',False) else 'READ-ONLY TELEMETRY' if getattr(self,'_read_only',False) else 'SIMULATION' if self._simulated else 'Hardware')+(' · Compact' if small else ''))
 
-def main(argv=None):
+def _run_once(argv=None):
  parser=argparse.ArgumentParser(description=__doc__)
  mode=parser.add_mutually_exclusive_group();mode.add_argument('--simulate',action='store_true',help='Offline simulation (default)');mode.add_argument('--hardware',action='store_true',help='Real amplifier access; requires prior explicit operator approval')
  mode.add_argument('--read-only',action='store_true',help='Real telemetry only; all operating and tuning commands blocked')
@@ -78,10 +88,12 @@ def main(argv=None):
  parser.add_argument('--host',help='Approved amplifier address for this launch')
  parser.add_argument('--amp-port',type=int,help='Amplifier TCP port for this launch')
  parser.add_argument('--smoke-test',action='store_true',help='Exercise the real WebView2 window offline, then exit')
+ parser.add_argument('--start-disconnected',action='store_true',help='Ignore auto-connect and wait for an explicit Connect click')
+ parser.add_argument('--access-smoke-test',action='store_true',help='Offline simulation-only UI and self-relaunch test')
  parser.add_argument('--trace-telemetry',action='store_true',help='Save private bounded raw amplifier replies and decoder events under local application data')
  args=parser.parse_args(argv)
  if sys.platform!='win32':parser.error('The Windows desktop host requires Windows')
- if args.smoke_test and (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('Smoke tests must be offline')
+ if (args.smoke_test or args.access_smoke_test) and (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('Smoke tests must be offline')
  if (args.host or args.amp_port is not None) and not (args.hardware or args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test):parser.error('An amplifier endpoint requires an explicit hardware access mode')
  configure_process_dpi()
  directory=settings.data_directory();directory.mkdir(parents=True,exist_ok=True)
@@ -112,13 +124,20 @@ def main(argv=None):
    from dxc_feed import start
    try:feed=start(monitor)
    except OSError:logging.exception('DX Caliber feed unavailable')
-  if simulated or monitor.settings['auto_connect'] or ((args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test) and monitor.settings['host']):monitor.connect()
+  if not args.start_disconnected and (simulated or monitor.settings['auto_connect'] or ((args.read_only or args.mode_test or args.power_test or args.readiness_test or args.tune_test) and monitor.settings['host'])):monitor.connect()
   bridge=DisplayBridge(directory/'window.json',preferences);bridge._simulated=simulated
   bridge._read_only=args.read_only
   bridge._mode_test=args.mode_test
   bridge._power_test=args.power_test
   bridge._readiness_test=args.readiness_test
   bridge._tune_test=args.tune_test
+  bridge._monitor=monitor
+  bridge._access_allowed=not (args.mode_test or args.power_test or args.readiness_test or args.tune_test or args.smoke_test)
+  bridge._access_args=None
+  bridge._access_smoke_only=args.access_smoke_test
+  access_config={'allowed':bridge._access_allowed,'mode':'simulation' if simulated else 'read-only' if args.read_only else 'hardware','host':monitor.settings['host'],'port':monitor.settings['port']}
+  access_html=Path(__file__).with_name('windows_access.html').read_text(encoding='utf-8').replace('__WINDOWS_ACCESS_SCRIPT__','window.omAccessMode='+json.dumps(access_config).replace('<','\\u003c')+';'+Path(__file__).with_name('windows_access.js').read_text(encoding='utf-8'))
+  server.html=server.html.replace('</main>',access_html+'</main>')
   size=(420,790) if preferences.get('compact') else preferences.get('full_size',(900,900))
   url=f'http://127.0.0.1:{server.server_port}/'
   if args.tune_test:logging.info('Operator RF tune-test service: %s',url)
@@ -141,6 +160,18 @@ def main(argv=None):
    def navigating(sender,event):
     if str(event.Uri)!=url:event.Cancel=True
    window.native.webview.NavigationStarting+=navigating
+   # Let the bridge reply finish before JS requests close. Destroying here from
+   # request_access_mode races pywebview's asynchronous return-value delivery.
+   def close_requested(sender,event):
+    if bridge._access_args is not None and str(sender.Source)==url:window.destroy()
+   def attach_access_close(sender=None,event=None):
+    if not getattr(window,'_access_close_attached',False) and window.native.webview.CoreWebView2 is not None:
+     window.native.webview.CoreWebView2.WindowCloseRequested+=close_requested
+     window._access_close_attached=True
+   window._access_close_hook=close_requested
+   window._access_init_hook=attach_access_close
+   window.native.webview.CoreWebView2InitializationCompleted+=attach_access_close
+   attach_access_close()
    from System import Action
    # pythonnet's WinForms DPI event can be disabled. Observe the native
    # notification, then update the minimum and apply its rectangle after
@@ -160,9 +191,40 @@ def main(argv=None):
    trace=(directory/'smoke-trace.log').open('w')
    faulthandler.dump_traceback_later(20,file=trace)
   def smoke():
+   if args.access_smoke_test:
+    try:
+     import time
+     if not window.events.loaded.wait(25):raise RuntimeError('Access UI did not load')
+     def wait_access(expression):
+      deadline=time.monotonic()+15
+      while not window.evaluate_js(expression):
+       if time.monotonic()>deadline:raise RuntimeError('Access UI condition timed out: '+expression)
+       time.sleep(.1)
+     wait_access("typeof lastState !== 'undefined' && lastState.connection === 'Connected'")
+     if not window.evaluate_js("document.getElementById('applyAccessMode').disabled"):raise RuntimeError('Connected mode switch was enabled')
+     window.evaluate_js("document.getElementById('view').click()")
+     if not window.evaluate_js("document.getElementById('accessModePanel').getBoundingClientRect().height > 0"):raise RuntimeError('Compact view hides access selector')
+     window.evaluate_js("document.getElementById('view').click();document.getElementById('disconnect').click()")
+     wait_access("lastState.connection === 'Disconnected' && !document.getElementById('applyAccessMode').disabled")
+     for mode in ('read-only','hardware'):
+      window.evaluate_js("window.confirm=()=>false;document.getElementById('accessMode').value="+json.dumps(mode)+";document.getElementById('accessMode').onchange();document.getElementById('applyAccessMode').click()")
+      time.sleep(.2)
+      if bridge._access_args is not None:raise RuntimeError('Canceled hardware choice requested a launch')
+     window.evaluate_js("document.getElementById('accessMode').value='simulation';document.getElementById('accessMode').onchange();document.getElementById('applyAccessMode').click()")
+     deadline=time.monotonic()+5
+     while bridge._access_args is None:
+      if time.monotonic()>deadline:raise RuntimeError('Native simulation handoff was not requested')
+      time.sleep(.1)
+     logging.info('OFFLINE ACCESS MODE HANDOFF REQUESTED')
+    except Exception as exc:failures.append(exc);logging.exception('Access smoke failed');window.destroy()
+    return
    if not args.smoke_test:return
    try:
     if not window.events.loaded.wait(25):raise RuntimeError('WebView2 did not load')
+    if args.start_disconnected:
+     if monitor.snapshot()['connection']!='Disconnected' or monitor.simulator.sent:raise RuntimeError('Relaunch connected automatically')
+     logging.info('OFFLINE RELAUNCH STARTED DISCONNECTED')
+     window.evaluate_js("document.getElementById('connect').click()")
     # Exercise the actual HWND, not WinForms' potentially stale DeviceDpi or
     # mocked APIs. This remains an explicitly offline smoke test.
     import ctypes
@@ -232,7 +294,7 @@ def main(argv=None):
   webview.start(smoke,gui='edgechromium',private_mode=True,storage_path=str(directory/'WebView2'))
   if args.smoke_test:faulthandler.cancel_dump_traceback_later();trace.close()
   if failures:raise RuntimeError(str(failures[0]))
-  return 0
+  return bridge._access_args if bridge._access_args is not None else 0
  finally:
   if monitor:
    monitor.disconnect()
@@ -243,6 +305,19 @@ def main(argv=None):
    server.server_close()
   lock.close()
   if wire_trace_writer is not None:wire_trace_writer.close()
+
+def main(argv=None):
+ # A simulation session's temporary settings override must not follow the new
+ # process into hardware mode (or leak back into a source-hosted caller).
+ original=os.environ.get('OM_SETTINGS_PATH')
+ try:result=_run_once(argv)
+ finally:
+  if original is None:os.environ.pop('OM_SETTINGS_PATH',None)
+  else:os.environ['OM_SETTINGS_PATH']=original
+ if isinstance(result,list):
+  launch_replacement(result)
+  return 0
+ return result
 
 if __name__=='__main__':
  try:sys.exit(main())
