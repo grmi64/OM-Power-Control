@@ -1134,3 +1134,56 @@ only. The Windows test runner now includes it and requires WebView2/desktop acce
 Validation: 199 Python tests (193 passed, six expected skips), all six JavaScript
 suites and all eight rendering cases passed. No release EXE/ZIP/MSIX rebuild,
 amplifier connection, Store submission, merge or release publication occurred.
+
+## Network interface alive with PA off — 2026-10-25
+
+During the authorized read-only GUI check, the operator confirmed that the PA
+was off while its TCP/IP interface remained alive. The saved status reply was
+`ST1000- HEXBEAM`; temperature and frequency telemetry were fresh, with no power
+measurements and no control requests. The decoder previously displayed Unknown.
+It now recognizes this observed code as Off, using the existing UI presentation
+"Amplifier off / Network listener connected". ST2000 remains supported; other
+unverified codes remain Unknown. No operating, tuning or power command was sent.
+
+Offline regressions cover fragmentation of the observed reply and telemetry,
+unavailable power readings, mode transitions, unknown-code rejection, and
+preservation of RF-active state until independent RF-release evidence. All 201
+Python tests completed: 195 passed and six expected skips. The JavaScript state
+presentation/control checks passed. Restricted-run loopback and temporary-file
+failures were resolved by using a workspace test directory and allowing local
+test servers; no test connected to the amplifier.
+
+The local portable EXE was rebuilt and signed with Azure Artifact Signing;
+Windows verified the Gregory Miller signature and Microsoft timestamp. All 12
+decoder tests were rerun against the decoder extracted from that exact EXE:
+ten passed and two private-capture tests skipped. The signed EXE's isolated
+offline WebView2 smoke test passed, including simulated auto-tune/RF release,
+display modes and native DPI checks, then exited cleanly. The notice audit
+passed for 55 notice/source files. The ZIP and checksum were regenerated after
+signing. The prior signed EXE/ZIP were retained privately for comparison.
+
+The operator then connected the rebuilt signed app in read-only mode while the
+PA remained off and confirmed the visible "Amplifier off" and network-listener
+labels. This verifies the corrected live off-state display, not powered Standby
+stability or RF behavior. No operating, tuning or power commands were authorized
+or sent for this check.
+
+The production Store package is unchanged. No Store submission or publication
+occurred. The local portable build was made from main 08a8d28 plus this source
+fix before its review-branch commit; it is not a new merged-main Store candidate.
+
+During the subsequent operator-initiated front-panel power-up, an initially
+reported approximately 30-second countdown discrepancy was not reproduced in
+the read-only samples. Across 14.1 seconds, the reported countdown fell from 60
+to 46 seconds; telemetry age was 0.1–0.6 seconds, and the control-request history
+remained empty. The operator then confirmed that both countdowns were in sync.
+No countdown correction was made. The operator confirmed that the app and front
+panel entered Standby at the same time. A subsequent one-minute read-only
+observation of the rebuilt EXE passed: all 18 samples were Connected/Standby,
+maximum telemetry age was 0.6 seconds, forward/reflected readings were zero,
+temperature was 21.5–22 degrees C, sharing stayed disabled, and the control
+request history remained empty. RF remained off. The operator confirmed that
+the available powered readings matched the amplifier front panel.
+The operator's subsequent Disconnect/Connect test restored readings. A local
+state check confirmed Connected/Standby, read-only enabled, telemetry age 0.3
+seconds, transmitting false, sharing disabled, and zero control requests.

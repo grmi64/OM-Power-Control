@@ -25,7 +25,7 @@ class Tests(unittest.TestCase):
  def test_readings(self):
   rows=replay(CAPTURE_DIR/'OM3501A-readings.pcapng');r=[x for x in rows if x.get('forward')==1433 and x.get('input')==21];self.assertTrue(r);self.assertEqual(rows[-1]['forward'],0);self.assertFalse(rows[-1]['transmitting']);self.assertAlmostEqual(rows[-1]['time'],49.012,places=2)
  def test_verified_startup_codes_and_fragmentation(self):
-  for code,mode in [('1110','Operate'),('1100','Standby'),('2000','Off')]:
+  for code,mode in [('1110','Operate'),('1100','Standby'),('1000','Off'),('2000','Off')]:
    msg=('ST'+code+'- HEXBEAM;').encode()
    for cut in range(len(msg)+1):
     d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:]);self.assertEqual(d.state['status'],mode)
@@ -43,4 +43,22 @@ class Tests(unittest.TestCase):
   d.feed(b'ST2000- DOUBLET;');self.assertEqual(d.state['status'],'Off');self.assertIsNone(d.state['antenna_number'])
  def test_unverified_code_does_not_claim_known_mode(self):
   d=Decoder();d.feed(b'ST1110- HEXBEAM;ST1120- HEXBEAM;');self.assertEqual(d.state['status'],'Unknown')
+ def test_network_alive_pa_off_reply_preserves_telemetry(self):
+  msg=b'ST1000- HEXBEAM;TE40;FR29417;'
+  for cut in range(len(msg)+1):
+   with self.subTest(cut=cut):
+    d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:])
+    self.assertEqual(d.state['status'],'Off')
+    self.assertEqual(d.state['startup_status_reply'],'ST1000- HEXBEAM')
+    self.assertEqual(d.state['antenna_name'],'HEXBEAM')
+    self.assertIsNone(d.state['antenna_number'])
+    self.assertEqual(d.state['temperature_c'],20)
+    self.assertEqual(d.state['frequency_khz'],29417)
+    self.assertIsNone(d.state['forward']);self.assertIsNone(d.state['reflected'])
+ def test_off_status_does_not_invent_rf_release(self):
+  d=Decoder();d.feed(b'ST1110- HEXBEAM;PTTON;ST1000- HEXBEAM;')
+  self.assertEqual(d.state['status'],'Off');self.assertTrue(d.state['transmitting'])
+  d.feed(b'ST1100- HEXBEAM;');self.assertEqual(d.state['status'],'Standby')
+  d.feed(b'ST1110- HEXBEAM;');self.assertEqual(d.state['status'],'Operate')
+  d.feed(b'ST1001- HEXBEAM;');self.assertEqual(d.state['status'],'Unknown')
 if __name__=='__main__':unittest.main()
