@@ -868,3 +868,256 @@ expected skips, plus all five JavaScript suites. The current signed package's
 The signed binary and previously recorded ZIP test evidence are unchanged;
 updated source documentation is committed separately for review, not published
 as a release. No amplifier connection or operating commands occurred.
+
+## Internet-marked ZIP check — 2026-10-24 (offline limitation)
+
+The signed ZIP from merged main a914b5e was copied into the network-disabled
+Sandbox and verified against SHA-256
+14b7b5108c3a785e4cba29cf3ef06af889b539119d1de73c1a29946a0446fdfb.
+A Zone.Identifier stream with ZoneId=3 was added to that disposable guest copy
+only. This is synthetic Internet-zone metadata, not an actual browser download;
+the public repository URL was used as a provenance hint, with no release upload.
+The original local EXE, ZIP and checksum were not modified.
+
+Using Windows Explorer Extract All succeeded. All 243 extracted files retained
+Internet-zone marks, including the EXE, Python.Runtime.dll and WebView2 Core DLL.
+The EXE SHA-256 remained
+344b9dd684aea9a92b598d11a220bfb3aeb30d965421de5be467769ad7933ef1.
+Guest Authenticode status was Valid, publisher Gregory Miller, timestamp present.
+Zero guest network adapters were confirmed.
+
+A normal Explorer double-click of the extracted EXE triggered "SmartScreen can't
+be reached right now", explaining that the Internet connection was unavailable.
+The dialog identified Publisher: Gregory Miller and App: OM Power Control.exe.
+No app process started. No Run/bypass action, unblocking, or security-setting
+change was performed. The operator dismissed the dialog with Don't Run.
+
+Result: extraction, Internet-mark propagation and local signature checks passed.
+Internet-marked application startup and live SmartScreen reputation were NOT
+verified because the offline warning stopped launch. Prior unmarked simulation
+passes do not substitute for this pending check. Testing the cloud reputation
+path requires a separately authorized Internet-enabled environment, while the
+app must still use offline simulation with no amplifier connection.
+Private evidence: .tmp/clean-pc-test/results/download-marking-prep.json,
+download-extraction.json and download-key-files.json. No amplifier connection,
+operating/tuning/power command, publication or release upload occurred.
+
+## Internet-enabled SmartScreen check — 2026-10-24
+
+A fresh Windows Sandbox enabled networking solely for the authorized SmartScreen
+check. Clipboard, microphone, camera and printer redirection remained disabled;
+package input remained read-only. The guest had one active network adapter and
+successfully reached https://www.microsoft.com/ over HTTPS (HTTP 200). No local
+network/amplifier endpoint was probed.
+
+The same unpublished signed ZIP was checksum-verified:
+14b7b5108c3a785e4cba29cf3ef06af889b539119d1de73c1a29946a0446fdfb.
+Only a disposable guest copy received synthetic ZoneId=3 metadata; no release
+file was uploaded and no actual browser download/distribution URL was tested.
+Explorer Extract All succeeded. The EXE and representative WebView2/Python.NET
+DLLs retained their Internet-zone marks and expected hashes.
+
+Normal Explorer launch produced "Windows protected your PC" and stated that
+Microsoft Defender SmartScreen prevented an unrecognized app from starting.
+This differs from the offline test's "SmartScreen can't be reached right now"
+message. The independent guest Authenticode check reported Valid, publisher
+Gregory Miller, timestamp present; the EXE hash remained
+344b9dd684aea9a92b598d11a220bfb3aeb30d965421de5be467769ad7933ef1.
+No OM Power Control process started. No bypass, unblocking or security-setting
+change was performed. The operator dismissed the warning with Don't run.
+
+Result: Internet-enabled marked-file launch still warns for this exact signed
+build. This is NOT a warning-free SmartScreen acceptance pass. Application
+startup with Internet-marked assemblies remains unverified beyond the warning;
+prior unmarked simulation checks remain separate. The final browser-download
+URL/channel behavior is also untested because nothing has been published.
+There was no amplifier connection, operating/tuning/power command or publication.
+
+Private evidence: .tmp/clean-pc-test/results/online-smartscreen-prep.json,
+online-smartscreen-connectivity.json, online-smartscreen-key-files.json, and
+online-smartscreen-signature.json. Original local release EXE/ZIP/checksum are
+unchanged. These new test results remain local and uncommitted.
+
+## SmartScreen remediation investigation — 2026-10-24
+
+See WINDOWS-SMARTSCREEN.md for the evidence, current primary Microsoft guidance,
+and distribution choices. The current valid signed/timestamped EXE remains
+unchanged. The observed unrecognized-app warning is consistent with new-file/
+publisher reputation; its exact scoring cause is not externally available.
+Microsoft's current guidance does not promise a consumer reputation fast-track,
+and an EV certificate is not an automatic remedy. Store-delivered MSIX is the
+alternative distribution path to investigate if warning-free first installation
+is required; the existing GitHub ZIP does not acquire Store reputation merely
+by changing its packaging or signing provider.
+
+No file submission, support message, security bypass, new build, amplifier
+connection, merge, push, tag or publication occurred. No marked-copy application
+launch was attempted again. The release files and signing identity were retained.
+
+## Local MSIX feasibility — 2026-10-24
+
+See WINDOWS-MSIX-FEASIBILITY.md and packaging/msix-feasibility/ for the local
+prototype and boundaries. A copy of the signed a914b5e portable app was wrapped
+as OMPowerControl.Feasibility without changing its application code or bundled
+binaries. MakeAppx validation, Azure package signing/timestamping and signature
+verification passed. Matching full SDK signing dependencies were required; the
+older SignTool-only installation did not recognize the MSIX format.
+
+In a fresh network-disabled Sandbox, actual package installation and Windows
+package activation succeeded. GetPackageFullName confirmed process identity.
+Python.NET/WebView2 startup, real DPI/native bridge/full/compact controls and
+simulated auto-tune/save/RF release passed the built-in smoke. Preferences saved
+under package-specific LocalCache storage and survived reopening and the local
+0.1.31.0 -> 0.1.31.1 update. All tested launches exited 0. Uninstall removed app
+registration and package app data; reinstall restored default settings. No-argument
+activation also defaulted to simulation. The reader mutex was visible from an
+unpackaged test process while the packaged app was running. The final prototype
+was uninstalled from the guest, and no MSIX was installed on the host.
+
+The original signed EXE and ZIP hashes are unchanged. Prototype packages, SDK
+provenance and private integration evidence remain in ignored .tmp directories.
+This establishes local packaging feasibility, not Store approval, Store delivery,
+Internet-marked MSIX acceptance, or a fix for the GitHub ZIP's SmartScreen warning.
+Real Store identity/signing, restricted-capability review, production versioning,
+certification-kit checks, settings migration/support documentation and release
+acceptance remain work. Hardware/physical-monitor limitations are unchanged.
+No amplifier connection, real RF, Store submission or publication occurred.
+
+## Reserved Store identity and unsigned candidate — 2026-10-24
+
+The operator supplied the reserved Store identity. Only the public name,
+publisher, publisher display name and PFN were extracted from the attachment;
+no source RTF or unrelated credentials were copied. See
+WINDOWS-STORE-PREPARATION.md and packaging/windows-store/identity.json.
+
+A repeatable local builder created a MakeAppx-validated, unsigned outer MSIX
+with the exact Store identity and package version 1.0.31.0 (application 0.1.31),
+targeting Windows 11 x64. The outer publisher is Store-assigned CN=GUID, distinct
+from the Azure-signed inner EXE's legal-name publisher. The portable EXE and ZIP
+are unchanged. The unsigned candidate is not a general sideload release.
+
+The candidate archive passed identity/display-name checks, all 55 notice/source
+and 78 binary hashes, all 680 SHA-256 block-map checks, and private-file exclusion.
+The builder rejected invalid Store versions 0.1.31.0 and 1.0.31.1. Candidate hash:
+ff4c5c04c7db144df73d2bc1cc58985919f46f28db8e0c99714d06b0c6bb346e.
+Exact-identity installation and Windows App Certification Kit checks remain
+pending; earlier feasibility-package passes remain separate. No new app process,
+amplifier connection, Store submission or publication occurred in this step.
+
+## Exact Store-identity deployment tests — 2026-10-24
+
+The exact Store package identity 1.0.31.0 passed offline Sandbox installation
+and activation, real WebView2/DPI smoke, simulated tuning/save/RF release and
+Standby, saved preferences after reopening, uninstall/data removal, and clean
+reinstall with a no-argument simulation launch. All tested app exits were zero.
+The native activated-process identity matched the reserved Store identity.
+
+A temporary matching test certificate was created/trusted only in the
+network-disabled Sandbox and removed after the test package was uninstalled.
+Host certificate stores and original EXE/ZIP/unsigned candidate remain unchanged.
+Zero network adapters were observed; no amplifier connection occurred.
+See WINDOWS-STORE-PREPARATION.md for scope, evidence and remaining limitations.
+
+After separate approval for downloading/staging, Windows App Certification Kit
+10.0.26100.9457 was installed only inside the offline Sandbox and run against the
+exact identity. Overall result WARNING: 22 passed, one optional blocked-executables
+failure in bundled runtimes, one nonoptional DPI warning (EXE analysis failed).
+The installed app's PerMonitorV2/UI smoke passed again; the scanner discrepancy
+remains unresolved. No tests were manually deselected; XML PARTIAL_RUN is FALSE.
+See WINDOWS-STORE-CERTIFICATION.md for full findings and private evidence paths.
+Test package and temporary certificate were removed after completion; release
+artifact hashes remain unchanged. No clean certification pass, Store submission
+or publication is claimed.
+
+## WACK DPI warning resolved by package-file validation — 2026-10-24
+
+The identical signed EXE's embedded manifest is readable with Microsoft MT and
+WACK's native parser returns PerMonitorV2 true for ordinary-folder copies. On
+the installed WindowsApps path, its DPI query returns E_FAIL after loading the
+binary. The initial installed-identity warning is an analysis-path problem;
+no application DPI or manifest changes were needed.
+
+The unchanged private test-signed MSIX passed the full documented
+`-appxpackagepath` workflow: overall PASS, PARTIAL_RUN FALSE, 23 passing checks,
+including DPIAwarenessValidation, and one retained optional blocked-executables
+finding in bundled runtimes. No tests or analyzer rules were disabled.
+The repeatable offline runner is scripts/run-windows-msix-wack.ps1.
+scripts/check-wack-report.py gates the XML results, not just process exit code;
+eight offline regression cases passed, including rejection of the old DPI warning.
+See WINDOWS-STORE-CERTIFICATION.md for detailed evidence and remaining scope.
+
+## Optional WACK bundled-runtime review — 2026-10-24
+
+The remaining optional Blocked executables FAIL (12 messages, eight binaries)
+was reviewed against local binary contexts and pinned application/dependency
+source. Findings include genuine general CPython/C runtime launch capabilities,
+OpenSSL API/configuration words, Unicode-name data and managed metadata strings.
+No application shell/helper-launch call sites were found. The wrapper disables
+external-browser links and downloads; alternate runtime-discovery paths remain
+outside the normal-runtime process-trace claim.
+
+One exact-package offline simulation smoke run was observed through process-start
+events: root startup captured, six expected msedgewebview2.exe descendants, no
+unexpected descendants, real UI/DPI smoke passed and exit zero. Test package and
+temporary certificate were removed; zero network adapters confirmed again.
+This is bounded evidence, not exhaustive launch tracing or S mode validation.
+
+Disposition: informational, not a local Store-preflight blocker for this
+candidate; preserve the optional result and rationale. Microsoft certification,
+restricted-capability review and final release approval remain separate.
+See WINDOWS-STORE-RUNTIME-REVIEW.md. No release binary changed, amplifier
+connection, Store submission or publication occurred.
+
+## Store capability and content drafts — 2026-10-24
+
+Prepared local runFullTrust justification, Store listing/metadata, offline reviewer
+instructions and support text under packaging/windows-store/content/, plus a
+draft Windows privacy policy at PRIVACY.md. The operator selected GitHub Issues
+as the public support channel; no account email/address was reused publicly.
+
+The drafts reflect simulation-first launches, explicit hardware access modes,
+OM-3501A validation scope, operator RF/drive responsibility, the local HTTP UI,
+per-user settings/browser storage/logs, optional raw traces and opt-in local
+DX Caliber telemetry/control. They distinguish app data handling from independent
+Microsoft/GitHub/companion-app services. No automatic diagnostic upload is claimed.
+
+Public policy hosting/effective date, listing assets, portal fields/rating/pricing/
+markets, and Store-user hardware launch workflow remain explicit pre-release work.
+No portal change, network request, amplifier connection, submission or publication
+was made. Release artifacts were not rebuilt or modified by this documentation task.
+
+## Store-user connection modes — 2026-10-24
+
+Implemented a Windows-only panel with explicit hardware confirmation, endpoint
+validation and same-executable relaunch. Normal launches remain simulation;
+every UI handoff starts disconnected despite endpoint/saved auto-connect.
+Restricted test sessions cannot upgrade scope. Simulation settings environment
+is restored before relaunch; amplifier command policy is unchanged.
+
+Final offline suite: 197 Python tests, 191 passed and six expected skips; all six
+JavaScript suites passed. An isolated exact-identity MSIX passed real panel,
+cancellation/compact and simulation-only parent/child handoff checks. Both native
+package identities matched and both exited zero. The child verified disconnected
+startup before explicit simulated Connect and UI/DPI/tuning smoke. The initial
+bridge-disposal race was fixed and retested with no disposal error. Notice/binary
+audit passed. Hardware-policy startup tests use mocked native/network components.
+
+No amplifier connection was made. Test package/certificate were removed; zero
+network adapters confirmed. Production EXE/ZIP/MSIX remain unchanged. Source
+review, rebuild/sign and new-candidate WACK/artifact acceptance remain. No
+submission/publication occurred. See WINDOWS-STORE-LAUNCH.md for full scope.
+
+## Launch-workflow review fixes — 2026-10-24
+
+Fixed acceptance of option-like/malformed hostnames before handoff, and attached
+valid endpoint values to --host= for unambiguous child argument parsing. Fixed
+validation errors disappearing on the next periodic UI update; errors now persist
+until edit/mode change/retry. New regressions verify rejection without arming or
+closing, valid endpoint forms, parsed disconnected startup, timer persistence,
+edit clearing and retry/close sequencing.
+
+Offline suite: 199 Python tests, 193 passed and six expected skips; all six JS
+suites passed. No native hardware session or amplifier connection was opened.
+These source fixes were not rebuilt into release artifacts in this step; EXE,
+ZIP and production Store MSIX hashes remain unchanged. No commit, push, merge,
+submission or publication occurred. See WINDOWS-STORE-LAUNCH.md for artifact scope.

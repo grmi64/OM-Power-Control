@@ -1,0 +1,11 @@
+{
+  "name": "GregoryMiller.OMPowerControl",
+  "publisher": "CN=01B6B2D5-A706-4EC7-9AC8-54F1A68995B4",
+  "publisher_display_name": "Gregory Miller",
+  "package_family_name": "GregoryMiller.OMPowerControl_ry0zqgvak7bfy",
+  "display_name": "OM Power Control",
+  "architecture": "x64",
+  "package_version": "1.0.31.0",
+  "min_windows_version": "10.0.22000.0",
+  "max_version_tested": "10.0.26300.0"
+}

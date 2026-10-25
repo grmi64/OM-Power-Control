@@ -1,0 +1,17 @@
+<section id="accessModePanel" style="border:1px solid #354249;border-radius:14px;padding:18px 20px;margin-top:18px;background:#1c2428">
+<strong>Connection mode</strong>
+<p class="note">Normal launches use offline simulation. Disconnect before changing mode. Applying a mode reopens the app disconnected; click Connect separately.</p>
+<label for="accessMode">Choose mode</label>
+<select id="accessMode" style="font:inherit;max-width:100%;padding:8px">
+<option value="simulation">Offline simulation</option>
+<option value="read-only">Read-only amplifier telemetry</option>
+<option value="hardware">Amplifier controls and tuning</option>
+</select>
+<div id="accessEndpoint" class="fields" hidden>
+<label>Amplifier address<input id="accessHost" type="text" maxlength="253" autocomplete="off"></label>
+<label>TCP port<input id="accessPort" type="number" min="1" max="65535" value="10001"></label>
+</div>
+<p id="accessModeMessage" class="note" aria-live="polite"></p>
+<button id="applyAccessMode" type="button" disabled>Apply mode and reopen</button>
+</section>
+<script>__WINDOWS_ACCESS_SCRIPT__</script>
