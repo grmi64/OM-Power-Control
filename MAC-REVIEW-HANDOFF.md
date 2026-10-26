@@ -82,3 +82,10 @@ obtain separate explicit approval for any Operate/tuning test. Close the Windows
 reader before an approved Mac connection. The operator alone supplies/stops RF
 and adjusts drive; the app must never key the radio or adjust its drive power.
 No power commands are authorized. Preserve private traces outside Git.
+
+
+## macOS Local Network identity checks
+
+Build native launchers with `scripts/build.sh`, which passes `-random_uuid` to the linker. macOS uses the main executable UUID when attributing Local Network permission. Merely copying a production executable and changing its bundle identifier can leave production and review apps with the same UUID and incorrect permission attribution. Recompile each review launcher and retain the unique-UUID linker option. Before installing, compare `dwarfdump --uuid` for the new launcher, installed app, and any review copies; their UUIDs must differ. Preserve production settings and use isolated review settings.
+
+Reference: https://developer.apple.com/documentation/technotes/tn3178-checking-for-and-resolving-build-uuid-problems
