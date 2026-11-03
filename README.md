@@ -23,15 +23,17 @@ The first public build is intended as a beta. Hardware verification so far cover
 - Expandable measurements: input power, plate current/voltage, screen current/voltage, grid voltage, heater voltages, mains voltage, temperature and calculated gain. Unavailable or stale telemetry is shown as a dash.
 - Saved display selector under Measurements: replace the reflected-power panel with input power, plate current or calculated gain, each with its own units and bar scale. The current choice is disabled in the menu.
 - SWR and reflected readings share a blended green/amber/red mismatch color; idle or unavailable readings are neutral.
-- Editable amplifier model label. OM-3501A is tested; other model names enable monitoring only and block operating commands. The model label does not select a different protocol.
+- Editable amplifier model label. OM-3501A is tested. OM-4001A is supported for monitoring only: it uses the vendor client's meter ranges (5000 W forward, 250 W reflected, 100 W input, ±80 mA screen current) and its scale marks and tube naming follow the vendor client (grid and heater voltages shown separately as f and b), and its operating commands stay blocked until validated on a real amplifier. Other model names use the 3500 W scale, also monitoring only. The model label selects display scale and control gating (see profiles.py); it does not select a different protocol.
 - Operate/Standby, normal shutdown/cooling, and power-on/warm-up.
 - Automatic tuning with amplifier-confirmed readiness, live measurements, successful completion/automatic saving, Exit and Stop. The operator sets drive power and supplies/stops RF; the app never keys or adjusts the radio.
 - Separate results for RF-interrupted/default-settings recovery and settings saved after Stop. Unexpected replies, delayed status and unconfirmed commands never count as successful tuning.
 - Successful-tune banner stays visible until Dismiss is clicked; a new successful tune shows it again.
+- Amplifier alerts: warnings (WGx) and second-limit alerts (FAx) appear in a banner and expire after 30 s; soft-start errors (FERROR) after 60 s. A hard fault (HF) or high-voltage fault (HVF) replaces the operating state and blocks operating commands (Stop during auto-tune is still allowed). HF clears when the amplifier stops reporting it; HVF stays until you reconnect. Faults are tracked separately from warnings, so a warning that arrives during a fault is shown alongside it and never clears it or lifts the command block. The app never sends a fault reset. While cooling above 40 °C the amplifier's reported temperature (CTx) is shown. These messages follow the manufacturer's protocol document and have not been provoked on hardware.
 - Amplifier-confirmed state, transmission guards and no automatic operating-command retries.
-- Full and compact views, saved stay-on-top and optional callsign badge.
+- Full and compact views, saved stay-on-top and optional callsign badge. The compact view adds a row of key readings: plate current, plate voltage, screen voltage and grid voltage (grid f and b separately on the OM-4001A).
 - Fixed 3500 W bar scale: green low-power region, amber at 1500 W, orange at 2500 W, red at 3500 W, with blended transitions. These are display colors, not calibrated protection limits or recommendations to transmit at a particular power.
-- Optional sharing with DX Caliber, off by default: the embedded panel uses this app’s existing amplifier connection. Standalone use does not require DX Caliber. With DXC DEV 0.6.116 or later, its embedded meter follows the measurement selected here.
+- Optional sharing with DX Caliber, off by default: the embedded panel uses this app’s existing amplifier connection. Standalone use does not require DX Caliber. With DXC DEV 0.6.116 or later, its embedded meter follows the measurement selected here. The shared feed includes `om.fault` (kind, title and message, or null) while a hard or high-voltage fault is in force; shared controls are refused during a fault.
+- Model check before commands: after connecting, operating commands wait up to 5 s for the amplifier's INFO reply to identify the model. A queued command is cancelled, not sent, if the reported model's controls are unverified (for example an OM-4001A behind an OM-3501A label). Without an INFO reply, the model label applies after the wait.
 - Save settings shows immediate saving and success/error feedback.
 - Optional auto-connect, off by default. One local reader process; disconnect other remote-control clients before connecting.
 
@@ -44,6 +46,10 @@ Use the amplifier within its manufacturer operating requirements and your statio
 ## Protocol status
 
 The driver was independently implemented from local hardware traffic. Exact status codes ST1110 and ST1100 were verified against front-panel Operate and Standby. Unknown status codes remain unconfirmed. SWR is calculated from measured forward/reflected power. Two live RF comparisons matched the amplifier display; forward power/SWR were also checked against a separate PowerMaster II. Full-range measurement calibration and extensive fault testing are not claimed. Additional telemetry scaling remains under validation. The selectable secondary bars use display ranges (reflected: 0–500 W; input: 0–100 W; plate current: 0–3 A; gain: 0–30 dB), not operating limits. Readouts retain values beyond the bar endpoints.
+
+## Offline simulator
+
+`python3 live.py --simulate` (the default when no mode flag is given) opens the page at http://127.0.0.1:51851 with synthetic data and no network access. Pick the simulated model in the simulation panel, or start with `--model OM-4001A`. The OM-4001A simulator follows the manufacturer's protocol document and a real warm-up capture (no antenna switch, per-second warm-up countdown, `#` replies about every 3.2 s) and adds Simulated PA on/off and a menu of injected alerts and faults. Only the Off, warm-up and Standby values come from the capture; everything else is synthetic.
 
 ## Building from source
 

@@ -7,7 +7,7 @@ class SessionCancelled(Exception):pass
 
 class ReadOnlySocket:
  """Allow only remote-session lifecycle and verified telemetry requests."""
- ALLOWED=frozenset((b'C',b'?',b'#',b'F'))
+ ALLOWED=frozenset((b'C',b'?',b'#',b'F',b'1'))
  def __init__(self,sock,record=lambda event:None):self._sock=sock;self._record=record
  def sendall(self,data):
   if data not in self.ALLOWED:raise ValueError('Read-only telemetry: operating and tuning commands are blocked')

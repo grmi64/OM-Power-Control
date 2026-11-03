@@ -17,7 +17,7 @@ class Tests(unittest.TestCase):
  def test_only_poll_and_clean_disconnect(self):
   m=Monitor(allow_hardware=True);s=FakeSocket(m)
   with patch('live.socket.create_connection',return_value=s):m.run()
-  self.assertEqual(s.sent,[b'C',b'?',b'#',b'F',b'C']);self.assertEqual(m.snapshot()['connection'],'Disconnected');self.assertIsNone(m.snapshot()['forward'])
+  self.assertEqual(s.sent,[b'C',b'?',b'1',b'#',b'F',b'C']);self.assertEqual(m.snapshot()['connection'],'Disconnected');self.assertIsNone(m.snapshot()['forward'])
  def test_worker_sends_toggle_once_and_confirms(self):
   m=Monitor(allow_hardware=True)
   class ControlSocket(FakeSocket):
@@ -25,7 +25,7 @@ class Tests(unittest.TestCase):
     if self.sent.count(b'C')>=2:return b'COFF;'
     self.reads+=1
     if self.reads==1:return b'CON;'
-    if self.reads==2:return b'STBY;PTTOFF;'
+    if self.reads==2:return b'STBY;PTTOFF;INFO:2401,224 66,0,03.25,355,OM3501A;'
     if self.reads==3:
      m.command('toggle','test-command-1')
      return b'TE63;'
@@ -97,7 +97,7 @@ class Tests(unittest.TestCase):
     m.stop.set();return b'TE63;'
   sock=PollSocket(m)
   with patch('live.socket.create_connection',return_value=sock),patch('live.time.monotonic',side_effect=lambda:clock[0]):m.run()
-  self.assertGreaterEqual(sock.sent.count(b'?'),2);self.assertTrue(set(sock.sent)<={b'C',b'?',b'#',b'F'})
+  self.assertGreaterEqual(sock.sent.count(b'?'),2);self.assertTrue(set(sock.sent)<={b'C',b'?',b'#',b'F',b'1'})
  def test_fresh_general_telemetry_cannot_refresh_expired_rf_state(self):
   m=Monitor(allow_hardware=True)
   m.state={'connection':'Connected','status':'Operate','transmitting':True,'_received':99,'_measurement':90,'_field_times':{'rf':90,'temperature_c':99},'temperature_c':32,'forward':2474,'input':21,'autotune_phase':'succeeded','autotune_saved':True}

@@ -22,7 +22,11 @@ def start(monitor,port=PORT):
    state='live' if live else 'stale' if s.get('connection')=='Stale' else 'disconnected'
    # No station address, callsign, raw packets or connection history leave the app.
    names=('antenna_name','antenna_number','connection','status','age_seconds','forward','reflected','swr','input','plate_a','gain_db','screen_ma','frequency_khz','temperature_c','transmitting','countdown','control')
-   om={k:s.get(k) for k in names};om['settings']={'model':s['settings'].get('model','OM-3501A'),'secondary_measurement':s['settings'].get('secondary_measurement','reflected')}
+   om={k:s.get(k) for k in names}
+   # Serious amplifier fault (HF/HVF) or None. While set, OM Power Control refuses every shared control,
+   # so DX Caliber should show the message and disable its controls; status may still read Operate/Standby.
+   fault=s.get('fault');om['fault']={'kind':fault['kind'],'title':fault['title'],'text':fault['text']} if fault else None
+   om['settings']={'model':s['settings'].get('model','OM-3501A'),'secondary_measurement':s['settings'].get('secondary_measurement','reflected')}
    self.reply(200,{'schema_version':1,'model':'OM Power Control','status':state,'age_seconds':s.get('age_seconds'),'om':om,'control_token':token})
   def do_POST(self):
    if not self.allowed() or self.path!='/api/v1/control' or not secrets.compare_digest(self.headers.get('X-OM-Feed-Token',''),token):self.reply(403,{'error':'Invalid local session.'});return

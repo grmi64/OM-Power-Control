@@ -1,14 +1,58 @@
 """Local monitoring prototype. Captured connection/status requests C, ?, and telemetry poll # only."""
-import argparse,json,socket,threading,time,secrets,tempfile,signal,os
+import argparse,errno,json,socket,threading,time,secrets,tempfile,signal,os
 from pathlib import Path
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from decoder import Decoder
 SLOW_FIELDS=('plate_a','plate_v','screen_v','heater_a_v','heater_b_v','mains_v','temperature_c','grid_a_v','grid_b_v')
+# Seconds an amplifier alert stays visible after it was last received (None: until reconnect).
+# The amplifier sends no all-clear: HF repeats every second while the fault persists.
+ALERT_TTL={'warning':30,'limit':30,'hard_fault':5,'hv_fault':None,'soft_start':60}
+from decoder import SERIOUS_FAULTS as FAULT_KINDS
+FAULT_TITLES={'hv_fault':'High-voltage fault','hard_fault':'Hard fault'}
+# Seconds after session setup that operating commands wait for the INFO reply to identify the model,
+# so a command cannot reach an amplifier whose reported model turns out to be monitoring only.
+IDENTIFY_SECONDS=5
 EXTRA_FIELDS=(*SLOW_FIELDS,'screen_ma','frequency_khz')
+HELD_FIELDS=(*SLOW_FIELDS,'frequency_khz')
 from controls import Controls
 import settings
+from profiles import profile as model_profile,resolve as resolve_profile
 from collections import deque
 from session_protocol import amplifier_session
+
+# Opening the TCP connection can fail while macOS is still asking for Local Network access (first launch)
+# and succeed once it is approved, so retry those failures, and only those, for a short while.
+CONNECT_RETRY_SECONDS=60
+CONNECT_RETRY_DELAY=2
+CONNECT_RETRY_NOTE='Waiting for network access to the amplifier. If macOS asks, choose Allow (System Settings > Privacy & Security > Local Network).'
+RETRY_ERRNOS=frozenset((errno.EHOSTUNREACH,errno.ENETUNREACH,errno.ETIMEDOUT,errno.ECONNREFUSED))
+def retryable_connect_error(error):
+ return isinstance(error,(socket.timeout,TimeoutError)) or (isinstance(error,OSError) and error.errno in RETRY_ERRNOS)
+
+def simulation_model(model,hardware,current):
+ """Validated model label for the --model option, which only applies to the offline simulator."""
+ if hardware:raise ValueError('--model only applies to --simulate; set the model in Connection & station')
+ return settings.validate({**current,'model':model})['model']
+
+def alert_age(state,now):
+ """Return the active alert and seconds since it was last received, or (None, None) once expired."""
+ alert=state.get('alert')
+ if not alert:return None,None
+ age=now-state.get('_field_times',{}).get('alert',now)
+ ttl=ALERT_TTL.get(alert.get('kind'),30)
+ return (None,None) if ttl is not None and age>ttl else (alert,round(age,1))
+
+def active_fault(state,now):
+ """Most serious fault still in force and seconds since it was last received, or (None, None).
+
+ Faults are tracked apart from warnings: a later WGx/FAx never clears one."""
+ faults=state.get('faults') or {};times=state.get('_field_times',{})
+ for kind in FAULT_KINDS:
+  fault=faults.get(kind)
+  if not fault:continue
+  age=now-times.get('fault:'+kind,now);ttl=ALERT_TTL.get(kind)
+  if ttl is None or age<=ttl:return {**fault,'title':FAULT_TITLES[kind]},round(age,1)
+ return None,None
 
 def readiness_requirement(step,state):
  """Require the exact acknowledged state at each authorized no-RF step."""
@@ -28,19 +72,21 @@ class Monitor:
   self.power_test=power_test;self.power_test_sent=0
   self.readiness_test=readiness_test;self.readiness_test_sent=0
   self.tune_test=tune_test;self.tune_test_counts={}
-  self.trace=trace
+  self.trace=trace;self.identify_until=None
   if tune_test:self.settings['share_dxc']=False
   if simulate:
-   from simulator import SimulatedAmplifier
-   self.simulator=SimulatedAmplifier();self.settings.update(host='simulation',auto_connect=False,share_dxc=False)
+   from simulator import simulator_for
+   self.simulator=simulator_for(self.settings.get('model'));self.settings.update(host='simulation',auto_connect=False,share_dxc=False)
  def snapshot(self):
   with self.lock:s={**self.state,'simulated':self.simulate,'read_only':self.read_only,'mode_test':self.mode_test,'mode_test_sent':self.mode_test_sent,'power_test':self.power_test,'power_test_sent':self.power_test_sent,'readiness_test':self.readiness_test,'readiness_test_sent':self.readiness_test_sent,'control':self.controls.view(),'settings':dict(self.settings),'connection_history':list(self.connection_history),'command_history':list(self.command_history)}
   field_times=s.pop('_field_times',{})
   now=time.monotonic();age=now-s.pop('_received',now)
   s['age_seconds']=round(age,1)
+  s['sim_features']=list(self.simulator.FEATURES) if self.simulate and self.simulator else []
   s['tune_test']=self.tune_test;s['tune_test_counts']={k.decode('ascii'):v for k,v in self.tune_test_counts.copy().items()}
   s['autotune_age_seconds']=round(now-field_times.get('autotune',now),1)
-  if s['connection']=='Connected' and age>3:s['connection']='Stale'
+  profile,s['model_notice']=resolve_profile(s.get('settings',{}).get('model'),s.get('info'))
+  if s['connection']=='Connected' and age>profile['fresh_seconds']:s['connection']='Stale'
   measurement_received=s.pop('_measurement',None)
   measurement_age=now-(measurement_received if measurement_received is not None else 0)
   # Fresh temperatures/status do not refresh an old RF-active indication.
@@ -56,9 +102,22 @@ class Monitor:
    s.update(forward=0,reflected=0,swr=None,input=0)
   elif measurement_age>3:
    s.update(forward=None,reflected=None,swr=None,input=None)
+  s['model_profile']=profile
+  # Profiles that hold slow readings keep the last value while the link is up or merely delayed.
+  # RF-derived values (screen_ma) never hold, so the transmit guard keeps its strict timeout.
+  hold=s['model_profile'].get('hold_slow_readings') is True and s['connection'] in ('Connected','Stale')
   for key in EXTRA_FIELDS:
+   if hold and key in HELD_FIELDS:continue
    limit=12 if key=='frequency_khz' else 3
    if s['connection']!='Connected' or now-field_times.get(key,0)>limit:s[key]=None
+  if s['model_profile'].get('grid_b_sign')==-1 and s.get('grid_b_v') is not None:s['grid_b_v']=-s['grid_b_v']
+  if s['model_profile'].get('screen_v_zero_while_warming') is True and s.get('status')=='Warming up' and s.get('screen_v') is not None:s['screen_v']=0.0
+  if profile.get('grid_zero_when_off') is True and s.get('status')=='Off':
+   for key in ('grid_a_v','grid_b_v'):
+    if s.get(key) is not None:s[key]=0.0
+  s['alert'],s['alert_age_seconds']=alert_age({**s,'_field_times':field_times},now)
+  s['fault'],s['fault_age_seconds']=active_fault({**s,'_field_times':field_times},now);s.pop('faults',None)
+  s['model_pending']=self.identify_until is not None and not s.get('info') and now<self.identify_until and s['connection'] in ('Connected','Waiting for amplifier data')
   s['grid_v']=s['grid_a_v']-s['grid_b_v'] if s.get('grid_a_v') is not None and s.get('grid_b_v') is not None else None
   if s.get('forward') is None or s.get('input') is None:s['gain_db']=None
   return s
@@ -66,7 +125,15 @@ class Monitor:
   with self.lock:self.connection_history.append({'time':round(time.time(),3),'event':event})
  def trace_decoded(self,decoder,stage='stream'):
   if self.trace is not None:self.trace.record('decoded',stage=stage,tokens=decoder.tokens,buffer_bytes=len(decoder.buffer),measurement_revision=decoder.measurement_revision,transmitting=decoder.state.get('transmitting'),rf_idle_confirmed=decoder.state.get('rf_idle_confirmed'),rf_idle_source=decoder.state.get('rf_idle_source'),autotune_phase=decoder.state.get('autotune_phase'))
+ def profile_now(self):
+  """Profile in force: the model the amplifier reported, else the model label."""
+  return resolve_profile(self.settings.get('model','OM-3501A'),self.state.get('info'))[0]
+ def settle(self):
+  """Let a session that is closing finish, so settings and a new connection do not race its shutdown."""
+  thread=self.thread
+  if thread and self.stop.is_set() and thread is not threading.current_thread():thread.join(2)
  def connect(self):
+  self.settle()
   with self.lock:
    if not self.simulate and not self.allow_hardware:raise ValueError('Hardware access is disabled. Explicit operator approval is required before launching with --hardware.')
    if self.thread and self.thread.is_alive():return
@@ -77,10 +144,11 @@ class Monitor:
    if not self.settings['host']:raise ValueError('Set and save the amplifier address before connecting')
    self.stop.clear();self.controls=Controls();self.state={'connection':'Connecting'}
    if self.simulate:
-    from simulator import SimulatedAmplifier
-    self.simulator=SimulatedAmplifier()
+    from simulator import simulator_for
+    self.simulator=simulator_for(self.settings.get('model'))
    self.thread=threading.Thread(target=self.run,daemon=True);self.thread.start()
  def configure(self,value):
+  self.settle()
   with self.lock:
    value=settings.validate({**self.settings,**value})
    active=self.thread and self.thread.is_alive()
@@ -123,25 +191,45 @@ class Monitor:
      if not duplicate:
       if self.mode_test_sent>=2:raise ValueError('Operate/Standby test is complete; further commands are blocked')
       if expected_mode!=('Standby' if self.mode_test_sent==0 else 'Operate'):raise ValueError('Mode test requires Standby to Operate, then Operate to Standby')
-    if self.settings.get('model','OM-3501A')!='OM-3501A':raise ValueError('Monitoring only: controls are unverified for this model')
+    if not self.profile_now()['controls_verified']:raise ValueError('Monitoring only: controls are unverified for this model')
     duplicate=key in self.controls.seen if isinstance(key,str) else False
-    self.controls.request(action,key,self.state,expected_mode)
+    self.controls.request(action,key,self.control_state(),expected_mode)
    except ValueError as exc:self.trace_command('rejected',pending,str(exc));raise
    if self.controls.pending and not duplicate:self.controls.pending['source']=pending['source']
    self.trace_command('duplicate ignored' if duplicate else 'queued',pending,self.controls.message)
+ def control_state(self):
+  """State handed to Controls, rechecked on every request and again immediately before a queued command is sent.
+
+  fault_active: a serious fault (HF/HVF) is in force, whatever warnings arrived after it.
+  controls_verified: the profile in force now, so an INFO reply that identifies a monitoring-only
+  model cancels a command queued under the label's profile.
+  model_pending: the INFO reply has not arrived yet and the identification wait has not passed."""
+  now=time.monotonic();fault,_=active_fault(self.state,now)
+  pending=self.identify_until is not None and not self.state.get('info') and now<self.identify_until
+  return {**self.state,'fault_active':fault is not None,'controls_verified':self.profile_now()['controls_verified'] is True,'model_pending':pending}
  def disconnect(self):
   with self.lock:
    self.stop.set()
    if self.thread and self.thread.is_alive():self.state={'connection':'Disconnecting'}
  def run(self):
-  dec=Decoder();received=time.monotonic();measurement=0;field_times={}
+  retry_until=time.monotonic()+CONNECT_RETRY_SECONDS
+  while self.run_once(retry_until):
+   if self.stop.wait(CONNECT_RETRY_DELAY):
+    with self.lock:self.state={**self.state,'connection':'Disconnected'}
+    return
+ def run_once(self,retry_until=None):
+  """One connection attempt. Returns True when a failed TCP connect was left for run() to retry."""
+  dec=Decoder();received=time.monotonic();measurement=0;field_times={};tcp_connected=[False]
+  def record(event):
+   if event=='TCP connected':tcp_connected[0]=True
+   self.record_connection(event)
   try:
    if self.simulate:
     from simulator import simulated_session
     session=simulated_session(self.simulator,self.stop,self.record_connection)
    else:
     if not self.allow_hardware:raise ValueError('Hardware access is disabled')
-    session=amplifier_session((self.settings['host'],self.settings['port']),self.stop,self.record_connection,read_only=self.read_only,mode_test=self.mode_test,power_test=self.power_test,readiness_test=self.readiness_test,trace=self.trace)
+    session=amplifier_session((self.settings['host'],self.settings['port']),self.stop,record,read_only=self.read_only,mode_test=self.mode_test,power_test=self.power_test,readiness_test=self.readiness_test,trace=self.trace)
    with session as (sock,handshake):
     if self.tune_test:
      from session_protocol import TuneTestSocket
@@ -162,16 +250,16 @@ class Monitor:
     self.trace_decoded(dec,'handshake')
     # The data timeout starts when session setup completes, not before TCP/setup.
     received=time.monotonic()
-    sock.sendall(b'?')
+    sock.sendall(b'?');sock.sendall(b'1')   # 1: one INFO request (model, firmware, hours) per connection
     next_poll=0;next_frequency=0;next_status=time.monotonic()+2
-    with self.lock:self.state={'connection':'Waiting for amplifier data','_received':received}
+    with self.lock:self.state={'connection':'Waiting for amplifier data','_received':received};self.identify_until=received+IDENTIFY_SECONDS
     while not self.stop.is_set():
      now=time.monotonic()
      if now-received>10:raise TimeoutError('No amplifier data for 10 seconds')
      with self.lock:
       previous=self.controls.pending;self.controls.tick()
       if previous and self.controls.pending is None:self.trace_command('uncertain',previous,self.controls.message)
-      previous=self.controls.pending;command=None if self.read_only else self.controls.take(self.state)
+      previous=self.controls.pending;command=None if self.read_only else self.controls.take(self.control_state())
       if previous and self.controls.pending is None:self.trace_command('cancelled',previous,self.controls.message)
      if command:
       if self.readiness_test:
@@ -221,6 +309,10 @@ class Monitor:
        if previous and self.controls.pending is None:self.trace_command('uncertain' if self.controls.uncertain else 'confirmed',previous,self.controls.message)
        self.state={**updates[-1],'connection':'Connected','_received':received,'_measurement':measurement,'_field_times':dict(field_times)}
   except Exception as e:
+   if not tcp_connected[0] and retry_until is not None and time.monotonic()<retry_until and not self.stop.is_set() and retryable_connect_error(e):
+    self.record_connection('Connection attempt failed ('+str(e)+'); retrying')
+    with self.lock:self.state={'connection':'Connecting','connect_note':CONNECT_RETRY_NOTE}
+    return True
    self.record_connection('Connection ended: '+str(e))
    with self.lock:
     previous=self.controls.pending;self.controls.lost()
@@ -232,6 +324,7 @@ class Monitor:
      previous=self.controls.pending;self.controls.lost()
      if previous:self.trace_command('uncertain' if self.controls.uncertain else 'cancelled',previous,self.controls.message)
      self.state={**self.state,'connection':'Disconnected'}
+  return False
 
 class Handler(BaseHTTPRequestHandler):
  def setup(self):
@@ -263,7 +356,12 @@ class Handler(BaseHTTPRequestHandler):
     size=int(self.headers.get('Content-Length','0'))
     if not 0<size<=1024:raise ValueError('Invalid simulation input size')
     value=json.loads(payload)
-    self.server.monitor.simulator.set_input(value['rf'],value.get('scenario','success'))
+    simulator=self.server.monitor.simulator
+    if 'power' in value:
+     if type(value['power']) is not bool:raise ValueError('Invalid simulation input')
+     simulator.set_power(value['power'])
+    elif 'alert' in value:simulator.inject(value['alert'])
+    else:simulator.set_input(value['rf'],value.get('scenario','success'))
    except (ValueError,TypeError,KeyError) as e:
     self.send(409,json.dumps({'error':str(e)}).encode());return
   elif self.path in ('/settings','/display-settings'):
@@ -295,12 +393,22 @@ def create_server(monitor,port=0,preferences=None):
 def main():
  p=argparse.ArgumentParser();p.add_argument('--port',type=int,default=51851)
  mode=p.add_mutually_exclusive_group();mode.add_argument('--simulate',action='store_true');mode.add_argument('--hardware',action='store_true',help='Enable real amplifier access only after explicit operator approval');mode.add_argument('--read-only',action='store_true',help='Real telemetry only; operating and tuning commands blocked')
+ p.add_argument('--model',metavar='MODEL',help='Amplifier model label for --simulate, e.g. OM-4001A')
+ p.add_argument('--trace',metavar='FILE',help='Save private raw amplifier replies and decoder events to a new JSONL file (hardware modes only)')
  a=p.parse_args()
  hardware=a.hardware or a.read_only
  from instance_lock import InstanceLock,READER_MUTEX
  if not hardware:os.environ.setdefault('OM_SETTINGS_PATH',str(settings.data_directory()/'simulation-settings.json'))
  lock=InstanceLock(settings.data_directory()/'instance.lock',name=READER_MUTEX)
- server=create_server(Monitor(simulate=not hardware,allow_hardware=hardware,read_only=a.read_only),a.port)
+ trace=None
+ if a.trace:
+  if not hardware:p.error('--trace needs --read-only or --hardware')
+  from wire_trace import WireTrace
+  trace=WireTrace(a.trace)
+ server=create_server(Monitor(simulate=not hardware,allow_hardware=hardware,read_only=a.read_only,trace=trace),a.port)
+ if a.model:
+  try:server.monitor.settings['model']=simulation_model(a.model,hardware,server.monitor.settings)
+  except ValueError as exc:p.error(str(exc))
  from dxc_feed import start as start_dxc_feed
  try:feed=start_dxc_feed(server.monitor) if a.hardware and not a.read_only else None
  except OSError:feed=None
@@ -315,4 +423,5 @@ def main():
   if server.monitor.thread:server.monitor.thread.join(4)
   if feed:feed.shutdown();feed.server_close()
   server.server_close();lock.close()
+  if trace:trace.close()
 if __name__=='__main__':main()

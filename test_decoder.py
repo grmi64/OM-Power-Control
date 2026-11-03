@@ -41,8 +41,16 @@ class Tests(unittest.TestCase):
     d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:]);self.assertEqual(d.state['status'],mode);self.assertEqual(d.state['antenna_name'],name);self.assertEqual(d.state['antenna_number'],antenna)
   d=Decoder();d.feed(b'ST2110- DOUBLET;PTTON;PTTOFF;ST2110- DOUBLET;');self.assertEqual(d.state['status'],'Operate')
   d.feed(b'ST2000- DOUBLET;');self.assertEqual(d.state['status'],'Off');self.assertIsNone(d.state['antenna_number'])
+ def test_no_antenna_switch_and_extended_antenna_codes(self):
+  # Protocol document: x is [0-9, A, F]; 0 means no antenna switch (OM-4001A observed: ST0100 in Standby).
+  for code,name,mode,antenna in [('0100','NO ANTENNA SWITCH','Standby',None),('0110','NO ANTENNA SWITCH','Operate',None),('0000','NO ANTENNA SWITCH','Off',None),('A110','Ant 2m','Operate',10),('5100','YAGI','Standby',5),('F100','NO ANTENNA','Standby',None)]:
+   msg=('ST'+code+'- '+name+';').encode()
+   for cut in range(len(msg)+1):
+    d=Decoder();d.feed(msg[:cut]);d.feed(msg[cut:]);self.assertEqual(d.state['status'],mode,code);self.assertEqual(d.state['antenna_name'],name);self.assertEqual(d.state['antenna_number'],antenna,code)
+  d=Decoder();d.feed(b'STBY;ST0100- NO ANTENNA SWITCH;');self.assertEqual(d.state['status'],'Standby')
  def test_unverified_code_does_not_claim_known_mode(self):
   d=Decoder();d.feed(b'ST1110- HEXBEAM;ST1120- HEXBEAM;');self.assertEqual(d.state['status'],'Unknown')
+  d=Decoder();d.feed(b'ST0110- NO ANTENNA SWITCH;ST0111- NO ANTENNA SWITCH;');self.assertEqual(d.state['status'],'Unknown')
  def test_network_alive_pa_off_reply_preserves_telemetry(self):
   msg=b'ST1000- HEXBEAM;TE40;FR29417;'
   for cut in range(len(msg)+1):

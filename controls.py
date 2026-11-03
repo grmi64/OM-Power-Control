@@ -23,6 +23,9 @@ class Controls:
   if key in self.seen:return
   if self.pending or self.uncertain:raise ValueError('Wait for confirmation; reconnect after an unconfirmed result')
   if state.get('connection')!='Connected' or now-state.get('_received',0)>3:raise ValueError('Fresh amplifier communication is required')
+  if state.get('controls_verified') is False:raise ValueError('Monitoring only: controls are unverified for this model')
+  if state.get('model_pending'):raise ValueError('Waiting for the amplifier to report its model; try again in a moment')
+  if state.get('fault_active') and action!='autotune-stop':raise ValueError('Amplifier fault active; commands are blocked until it clears')
   if state.get('transmitting') and action!='autotune-stop':raise ValueError('Stop transmission before changing amplifier state')
   reason=tune_guard(action,state)
   if reason:raise ValueError(reason)
@@ -39,7 +42,12 @@ class Controls:
  def take(self,state):
   if not self.pending or self.pending['sent'] is not None:return None
   reason=None
-  if state.get('transmitting') and self.pending['action']!='autotune-stop':reason='amplifier is transmitting'
+  # Recheck the model in force right before sending: an INFO reply that arrived after the command
+  # was queued may have selected a monitoring-only profile.
+  if state.get('controls_verified') is False:reason='the amplifier reported a model whose controls are unverified (monitoring only)'
+  elif state.get('model_pending'):reason='the amplifier has not reported its model yet'
+  elif state.get('fault_active') and self.pending['action']!='autotune-stop':reason='amplifier fault is active'
+  elif state.get('transmitting') and self.pending['action']!='autotune-stop':reason='amplifier is transmitting'
   elif state.get('connection')!='Connected' or time.monotonic()-state.get('_received',0)>3:reason='fresh amplifier data is unavailable'
   elif state.get('status') in ('Cooling down','Warming up'):reason='amplifier countdown is active'
   elif self.pending['action']=='on' and state.get('status') in ('On','Operate','Standby'):reason='amplifier is already on'

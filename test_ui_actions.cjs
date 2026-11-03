@@ -30,5 +30,37 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
  const saving=nodes.save.onclick();assert.equal(nodes.save.disabled,true);assert.equal(nodes.save.textContent,'Saving…');assert.equal(nodes.settingsSaveStatus.textContent,'Saving settings…');
  finishSave({ok:true,json:async()=>({})});await saving;assert.equal(nodes.save.disabled,false);assert.equal(nodes.settingsSaveStatus.textContent,'Settings saved.');
  ctx.fetch=async()=>({ok:false,json:async()=>({error:'Disk full'})});await nodes.save.onclick();assert.equal(nodes.settingsSaveStatus.dataset.error,'true');assert.match(nodes.settingsSaveStatus.textContent,/not saved: Disk full/);ctx.fetch=oldFetch;
+ // Compact key readings and per-model tube labels (OM-4001A shows grid f/b separately).
+ state={...state,connection:'Connected',age_seconds:0,plate_a:.85,plate_v:2900,screen_v:300,grid_v:-75,grid_a_v:75,grid_b_v:150,heater_a_v:27.8,heater_b_v:27.6,mains_v:239,model_profile:{tube_labels:['f','b'],grid_separate:true,full_scale_w:5000,screen_ma_range:[-80,80],screen_ma_tick_step:20,forward_ticks_w:[0,2500,5000]}};
+ await vm.runInContext('refresh()',ctx);
+ assert.equal(nodes.key_plate_a.textContent,'0.85 A');assert.equal(nodes.key_plate_v.textContent,'2,900 V');assert.equal(nodes.key_screen_v.textContent,'300 V');
+ assert.equal(nodes.key_grid_a_v.textContent,'75 V');assert.equal(nodes.key_heater_a_v.textContent,'27.8 V');assert.equal(nodes.key_heater_b_v.textContent,'27.6 V');assert.equal(nodes.key_mains_v.textContent,'239 V');assert.equal(nodes.keylabel_heater_a_v.textContent,'Uheat f');assert.equal(nodes.key_grid_b_v.textContent,'150 V');
+ assert.equal(nodes.keycell_grid_v.hidden,true);assert.equal(nodes.keycell_grid_a_v.hidden,false);assert.equal(nodes.keycell_grid_b_v.hidden,false);
+ assert.equal(nodes.keylabel_grid_a_v.textContent,'Ugrid f');assert.equal(nodes.label_heater_b_v.textContent,'Heater b · Uheat b');assert.equal(nodes.measurement_grid_b_v.textContent,'150 V');
+ assert.match(nodes.powerTicks.innerHTML,/>2\.5</);assert.match(nodes.auxTicks.innerHTML,/\+80 mA/);
+ state={...state,model_profile:undefined};await vm.runInContext('refresh()',ctx);
+ assert.equal(nodes.keycell_grid_v.hidden,false);assert.equal(nodes.keycell_grid_a_v.hidden,true);assert.equal(nodes.keylabel_grid_a_v.textContent,'Ugrid A');assert.equal(nodes.keylabel_heater_b_v.textContent,'Uheat B');assert.match(nodes.powerTicks.innerHTML,/3,500 W/);
+ // Simulator extras appear only when the simulator supports them.
+ const before=posts.length;
+ state={...state,simulated:true,sim_features:['power','alert']};await vm.runInContext('refresh()',ctx);assert.equal(nodes.simExtras.hidden,false);
+ node('simAlert').value='HF';await nodes.simAlertSend.onclick();assert.deepEqual(posts.at(-1).body,{alert:'HF'});assert.equal(nodes.simExtraState.textContent,'Sent: HF');assert.equal(posts.at(-1).path,'/simulation');
+ await nodes.simPowerOn.onclick();assert.deepEqual(posts.at(-1).body,{power:true});assert.equal(nodes.simExtraState.textContent,'Sent: PA on');await nodes.simPowerOff.onclick();assert.deepEqual(posts.at(-1).body,{power:false});assert.equal(posts.length,before+3);
+ state={...state,sim_features:[]};await vm.runInContext('refresh()',ctx);assert.equal(nodes.simExtras.hidden,true);
+ state={...state,simulated:false,sim_features:undefined};await vm.runInContext('refresh()',ctx);assert.equal(nodes.simExtras.hidden,true);
+ // Simulated model picker: disconnect, wait for it, save the model, reconnect.
+ {
+  const seen=posts.length;state={...state,simulated:true,connection:'Disconnected',settings:{...state.settings,model:'OM-3501A'}};
+  node('simModel').value='OM-4001A';await nodes.simModel.onchange();
+  assert.deepEqual(posts.slice(seen).map(p=>p.path),['/disconnect','/settings','/connect']);assert.deepEqual(posts[seen+1].body,{model:'OM-4001A'});assert.equal(nodes.simModelState.textContent,'Model: OM-4001A');
+  ctx.fetch=async(path,options)=>{if(options?.method==='POST')return {ok:false,json:async()=>({error:'Disconnect before changing amplifier address, port or model'})};return {ok:true,json:async()=>state}};
+  await nodes.simModel.onchange();assert.match(nodes.simModelState.textContent,/Disconnect before changing/);
+ }
+ // About amplifier panel and model notice.
+ state={...state,simulated:false,info:{model:'OM4001A',serial:'2302',firmware:'03.42',operating_minutes:55756},model_notice:''};await vm.runInContext('refresh()',ctx);
+ for(const text of ['Type of PA','OM4001A','Amplifier serial no.','2302','PA firmware version','3.42','Operating time','929h 16m'])assert.ok(nodes.aboutRows.innerHTML.includes('>'+text+'<'),text);
+ assert.equal(nodes.modelNotice.hidden,true);
+ state={...state,info:{model:'<b>X</b>',firmware:'03.42',operating_minutes:1},model_notice:'Amplifier reports X.'};await vm.runInContext('refresh()',ctx);
+ assert.ok(!nodes.aboutRows.innerHTML.includes('<b>'));assert.equal(nodes.modelNotice.hidden,false);assert.equal(nodes.modelNotice.textContent,'Amplifier reports X.');
+ state={...state,info:undefined,model_notice:''};await vm.runInContext('refresh()',ctx);assert.ok(nodes.aboutRows.innerHTML.includes('Available after connecting.'));assert.equal(nodes.modelNotice.hidden,true);
  console.log('Actual UI handlers: toggle skips prompt; power confirmations retained; RF guard and callsign badge pass');
 })().catch(e=>{console.error(e);process.exitCode=1});
