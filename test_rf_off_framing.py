@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 """Offline framing regressions using synthetic RF events and observed NUL padding."""
 import time,unittest
 from decoder import Decoder

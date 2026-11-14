@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 """No-RF acceptance scope: Operate, readiness, Exit, then Standby once."""
 import time,unittest
 from unittest.mock import patch

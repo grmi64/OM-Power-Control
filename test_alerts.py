@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 import unittest,time
 from decoder import Decoder,ALERT_NAMES
 from controls import Controls

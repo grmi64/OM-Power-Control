@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 """Read-only hardware policy verified offline before connecting equipment."""
 import json,threading,time,unittest,urllib.request,urllib.error
 from unittest.mock import patch

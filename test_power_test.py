@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 """Offline checks for an explicitly authorized shutdown/warm-up cycle."""
 import time,unittest
 from unittest.mock import patch

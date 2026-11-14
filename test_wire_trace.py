@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 """Wire tracing preserves exact bytes and cannot bypass access policies."""
 import json,tempfile,threading,unittest
 from pathlib import Path

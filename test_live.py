@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 import unittest,socket,time
 from unittest.mock import patch
 from live import Monitor

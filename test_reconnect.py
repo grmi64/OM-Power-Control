@@ -1,3 +1,4 @@
+import isolated_settings  # noqa: F401  (keep tests off the real settings file)
 """Regressions for session closure and startup timing; amplifier socket mocked."""
 import errno,socket,unittest
 from contextlib import contextmanager
