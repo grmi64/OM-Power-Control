@@ -29,12 +29,14 @@ class GridSignTests(unittest.TestCase):
  def snapshot(self,model,**fields):
   m=Monitor(simulate=True);m.settings['model']=model;now=time.monotonic()
   m.state={'connection':'Connected','_received':now,'_field_times':{k:now for k in fields},**fields};return m.snapshot()
- def test_4001a_grid_b_is_shown_with_the_vendor_sign(self):
-  s=self.snapshot('OM-4001A',grid_a_v=141.0,grid_b_v=141.0);self.assertEqual((s['grid_a_v'],s['grid_b_v']),(141.0,-141.0))
+ def test_4001a_grids_are_shown_with_the_vendor_sign(self):
+  s=self.snapshot('OM-4001A',grid_a_v=141.0,grid_b_v=141.0);self.assertEqual((s['grid_a_v'],s['grid_b_v']),(-141.0,-141.0))
   self.assertEqual(self.snapshot('OM-4001A',grid_a_v=141.0,grid_b_v=-3.0)['grid_b_v'],3.0)
  def test_missing_or_other_models_are_not_flipped(self):
   self.assertIsNone(self.snapshot('OM-4001A',grid_a_v=141.0).get('grid_b_v'))
-  s=self.snapshot('OM-3501A',grid_a_v=75.0,grid_b_v=150.0);self.assertEqual((s['grid_b_v'],s['grid_v']),(150.0,-75.0))
+  s=self.snapshot('OM-3501A',grid_a_v=75.0,grid_b_v=150.0);self.assertEqual((s['grid_a_v'],s['grid_b_v'],s['grid_v']),(75.0,150.0,-75.0))
+  # Real OM-4001A, v3.41 vendor client: UGA136/UGB136 shown as -136/-136; UGA60/UGB61 under drive shown as -59/-61 (raw 59/61).
+  s=self.snapshot('OM-4001A',grid_a_v=59.0,grid_b_v=61.0);self.assertEqual((s['grid_a_v'],s['grid_b_v']),(-59.0,-61.0))
 class HoldTests(unittest.TestCase):
  OLD=-20.0
  def snapshot(self,model,connection='Connected',**fields):
@@ -43,7 +45,7 @@ class HoldTests(unittest.TestCase):
  def test_4001a_holds_old_slow_readings_while_connected_or_delayed(self):
   for connection in ('Connected','Stale'):
    s=self.snapshot('OM-4001A',connection,plate_v=3250.0,screen_v=19.0,heater_a_v=9.0,mains_v=242.0,temperature_c=31.0,frequency_khz=14078,grid_a_v=141.0)
-   self.assertEqual((s['plate_v'],s['screen_v'],s['heater_a_v'],s['mains_v'],s['temperature_c'],s['frequency_khz'],s['grid_a_v']),(3250.0,19.0,9.0,242.0,31.0,14078,141.0),connection)
+   self.assertEqual((s['plate_v'],s['screen_v'],s['heater_a_v'],s['mains_v'],s['temperature_c'],s['frequency_khz'],s['grid_a_v']),(3250.0,19.0,9.0,242.0,31.0,14078,-141.0),connection)
  def test_4001a_does_not_hold_rf_derived_values_or_after_disconnect(self):
   self.assertIsNone(self.snapshot('OM-4001A',screen_ma=12.0,plate_v=3250.0)['screen_ma'])
   s=self.snapshot('OM-4001A','Disconnected',plate_v=3250.0,frequency_khz=14078);self.assertIsNone(s['plate_v']);self.assertIsNone(s['frequency_khz'])
@@ -79,7 +81,7 @@ class FreshnessAndOffTests(unittest.TestCase):
  def test_4001a_grid_voltages_read_zero_while_off_only(self):
   s=self.snapshot('OM-4001A','Off',grid_a_v=139.0,grid_b_v=139.0);self.assertEqual((s['grid_a_v'],s['grid_b_v']),(0.0,0.0));self.assertEqual(repr(s['grid_b_v']),'0.0')
   for status in ('Warming up','On','Standby','Operate','Cooling down'):
-   s=self.snapshot('OM-4001A',status,grid_a_v=128.0,grid_b_v=128.0);self.assertEqual((s['grid_a_v'],s['grid_b_v']),(128.0,-128.0),status)
+   s=self.snapshot('OM-4001A',status,grid_a_v=128.0,grid_b_v=128.0);self.assertEqual((s['grid_a_v'],s['grid_b_v']),(-128.0,-128.0),status)
   self.assertEqual(self.snapshot('OM-3501A','Off',grid_a_v=75.0,grid_b_v=150.0)['grid_b_v'],150.0)
   self.assertIsNone(self.snapshot('OM-4001A','Off',grid_a_v=139.0).get('grid_b_v'))
 if __name__=='__main__':unittest.main()

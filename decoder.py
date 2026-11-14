@@ -68,6 +68,7 @@ class Decoder:
                 token=self.buffer[:end].decode('ascii');self.buffer=self.buffer[end+1:]
                 self.tokens.append(token)
                 if token.startswith('ST') and token!='STBY':self.state['startup_status_reply']=token
+                # ST0111 (PTT keyed) was seen on a real OM-4001A during transmit; it is still Operate.
                 # STxabcd: x is the antenna [0-9, A, F] (0: no antenna switch), a/b/c are PA on, operate and PTT.
                 status_match=re.fullmatch(r'ST([0-9AF]\d{3})-\s*(.*)',token)
                 if status_match:
@@ -78,7 +79,7 @@ class Decoder:
                     # ST1000 was observed with the TCP interface alive and the
                     # operator confirming the PA was off (firmware 3.21); the protocol
                     # document also gives ST0000 (no antenna switch) for PA off.
-                    self.state['status']='Operate' if tail=='110' else 'Standby' if tail=='100' else 'Off' if tail=='000' else 'Unknown'
+                    self.state['status']='Operate' if tail in ('110','111') else 'Standby' if tail=='100' else 'Off' if tail=='000' else 'Unknown'
                     self.state.pop('countdown',None);self.state.pop('cooling_temp_c',None)
                 if token=='AUTO':
                     self.state.pop('load_pct',None);self.state.pop('tune_pct',None)

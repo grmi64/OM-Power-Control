@@ -50,7 +50,10 @@ class Tests(unittest.TestCase):
   d=Decoder();d.feed(b'STBY;ST0100- NO ANTENNA SWITCH;');self.assertEqual(d.state['status'],'Standby')
  def test_unverified_code_does_not_claim_known_mode(self):
   d=Decoder();d.feed(b'ST1110- HEXBEAM;ST1120- HEXBEAM;');self.assertEqual(d.state['status'],'Unknown')
-  d=Decoder();d.feed(b'ST0110- NO ANTENNA SWITCH;ST0111- NO ANTENNA SWITCH;');self.assertEqual(d.state['status'],'Unknown')
+  d=Decoder();d.feed(b'ST0110- NO ANTENNA SWITCH;ST0112- NO ANTENNA SWITCH;');self.assertEqual(d.state['status'],'Unknown')
+ def test_ptt_keyed_status_is_operate(self):
+  # ST0111 was captured from a real OM-4001A (firmware 03.42) while transmitting.
+  d=Decoder();d.feed(b'ST0110- NO ANTENNA SWITCH;ST0111- NO ANTENNA SWITCH;');self.assertEqual(d.state['status'],'Operate')
  def test_network_alive_pa_off_reply_preserves_telemetry(self):
   msg=b'ST1000- HEXBEAM;TE40;FR29417;'
   for cut in range(len(msg)+1):

@@ -110,7 +110,8 @@ class Monitor:
    if hold and key in HELD_FIELDS:continue
    limit=12 if key=='frequency_khz' else 3
    if s['connection']!='Connected' or now-field_times.get(key,0)>limit:s[key]=None
-  if s['model_profile'].get('grid_b_sign')==-1 and s.get('grid_b_v') is not None:s['grid_b_v']=-s['grid_b_v']
+  for sign_key,key in (('grid_a_sign','grid_a_v'),('grid_b_sign','grid_b_v')):
+   if s['model_profile'].get(sign_key)==-1 and s.get(key) is not None:s[key]=0.0-s[key]
   if s['model_profile'].get('screen_v_zero_while_warming') is True and s.get('status')=='Warming up' and s.get('screen_v') is not None:s['screen_v']=0.0
   if profile.get('grid_zero_when_off') is True and s.get('status')=='Off':
    for key in ('grid_a_v','grid_b_v'):

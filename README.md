@@ -47,6 +47,10 @@ Use the amplifier within its manufacturer operating requirements and your statio
 
 The driver was independently implemented from local hardware traffic. Exact status codes ST1110 and ST1100 were verified against front-panel Operate and Standby. Unknown status codes remain unconfirmed. SWR is calculated from measured forward/reflected power. Two live RF comparisons matched the amplifier display; forward power/SWR were also checked against a separate PowerMaster II. Full-range measurement calibration and extensive fault testing are not claimed. Additional telemetry scaling remains under validation. The selectable secondary bars use display ranges (reflected: 0–500 W; input: 0–100 W; plate current: 0–3 A; gain: 0–30 dB), not operating limits. Readouts retain values beyond the bar endpoints.
 
+### OM-4001A validation (read-only, firmware 03.42, vendor client v3.41)
+
+Checked against a real OM-4001A with the vendor client alongside, from power-up through Standby, Operate and one low-power transmission (about 320 W, SWR about 1.3). Status codes ST0000, WAx, ST0100, ST0110 and ST0111 (Operate, PTT keyed) were seen and decode correctly. Forward, reflected, plate current and voltage, screen current and voltage, and heater and mains readings matched the vendor client. Both grid voltages are shown negative, as in the vendor client. Telemetry blocks arrive about every 3.2 s in every state. Not yet checked: alert and fault decoding on real hardware, and any operating command, which stay blocked.
+
 ## Offline simulator
 
 `python3 live.py --simulate` (the default when no mode flag is given) opens the page at http://127.0.0.1:51851 with synthetic data and no network access. Pick the simulated model in the simulation panel, or start with `--model OM-4001A`. The OM-4001A simulator follows the manufacturer's protocol document and a real warm-up capture (no antenna switch, per-second warm-up countdown, `#` replies about every 3.2 s) and adds Simulated PA on/off and a menu of injected alerts and faults. Only the Off, warm-up and Standby values come from the capture; everything else is synthetic.

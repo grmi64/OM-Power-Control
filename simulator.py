@@ -128,7 +128,7 @@ class Simulated4001A(SimulatedAmplifier):
         with self.lock:
             if data==b'?':
                 self.sent.append(data);self.advance()
-                code={'Operate':b'ST0110','Standby':b'ST0100'}.get(self.mode,b'ST0000')
+                code={'Operate':b'ST0111' if self.rf else b'ST0110','Standby':b'ST0100'}.get(self.mode,b'ST0000')
                 self.emit(code+self.ANTENNA)
             elif data==b'#':
                 self.sent.append(data);self.advance();now=self.clock()
